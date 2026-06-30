@@ -1,5 +1,6 @@
 // Content script: サイドパネルからの抽出要求・スクロール要求に応答する。
 import { extractPageData } from './extract'
+import { expandHiddenComments } from './expand'
 import type {
   ContentRequest,
   ExtractResponse,
@@ -8,18 +9,21 @@ import type {
 chrome.runtime.onMessage.addListener(
   (message: ContentRequest, _sender, sendResponse) => {
     if (message?.kind === 'extract-page-data') {
-      try {
-        const data = extractPageData(document, location.href)
-        const response: ExtractResponse = { ok: true, data }
-        sendResponse(response)
-      } catch (err) {
-        const response: ExtractResponse = {
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        }
-        sendResponse(response)
-      }
-      return true
+      // 遅延ロード("Load more")を展開してから抽出する。
+      expandHiddenComments()
+        .catch(() => {})
+        .finally(() => {
+          try {
+            const data = extractPageData(document, location.href)
+            sendResponse({ ok: true, data } satisfies ExtractResponse)
+          } catch (err) {
+            sendResponse({
+              ok: false,
+              error: err instanceof Error ? err.message : String(err),
+            } satisfies ExtractResponse)
+          }
+        })
+      return true // 非同期応答
     }
 
     if (message?.kind === 'scroll-to-comment') {
