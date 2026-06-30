@@ -3,6 +3,7 @@ import type { PageData } from '../content/extract'
 import type {
   ContentRequest,
   ExtractResponse,
+  ThemeResponse,
 } from '../shared/messages'
 import { ChromeLlmClient } from '../summarize/llmClient'
 import {
@@ -17,6 +18,8 @@ import {
   SUPPORTED_LANGUAGES,
   getCachedNote,
   setCachedNote,
+  getCachedPalette,
+  setCachedPalette,
 } from './storage'
 import {
   el,
@@ -106,6 +109,19 @@ function renderSegmentList() {
   else resultsRoot.append(node)
 }
 
+/** テーマだけを軽量に取得して即適用・キャッシュする。 */
+async function applyThemeFast(tabId: number) {
+  try {
+    const res = await sendToTab<ThemeResponse>(tabId, { kind: 'extract-theme' })
+    if (res.ok) {
+      applyPalette(res.theme)
+      void setCachedPalette(res.theme)
+    }
+  } catch {
+    // content script 未準備等は無視（キャッシュ済みパレットのまま）。
+  }
+}
+
 async function loadPage() {
   setStatus('ページを読み込み中…')
   const tab = await getActiveTab()
@@ -116,6 +132,10 @@ async function loadPage() {
     setStatus('GitHub の issue / PR ページを開いてください。')
     return
   }
+
+  // テーマ(配色)は重い抽出を待たず先に取得して即適用する。
+  await applyThemeFast(tab.id)
+
   let res: ExtractResponse
   try {
     res = await sendToTab<ExtractResponse>(tab.id, { kind: 'extract-page-data' })
@@ -139,7 +159,6 @@ async function loadPage() {
     return
   }
   pageData = res.data
-  applyPalette(pageData.theme)
   segments = planSegments(pageData.comments, DEFAULT_SEGMENT_BUDGET)
   segmentStates.clear()
   clear(resultsRoot)
@@ -238,6 +257,9 @@ async function onSummarize(target: 'all' | number) {
 
 // 初期化
 async function init() {
+  // 直近の配色を先に適用してライトのちらつきを防ぐ。
+  const cached = await getCachedPalette()
+  if (cached) applyPalette(cached)
   lang = await getLanguage()
   renderShell()
   await loadPage()

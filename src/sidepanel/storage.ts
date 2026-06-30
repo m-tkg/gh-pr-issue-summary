@@ -1,8 +1,10 @@
 // chrome.storage.local による設定・キャッシュの薄いラッパ。
 
 import type { CommentNote } from '../summarize/types'
+import type { Palette } from '../content/theme'
 
 const LANG_KEY = 'outputLanguage'
+const PALETTE_KEY = 'lastPalette'
 
 export const SUPPORTED_LANGUAGES: { code: string; label: string }[] = [
   { code: 'ja', label: '日本語' },
@@ -16,6 +18,17 @@ export async function getLanguage(): Promise<string> {
 
 export async function setLanguage(lang: string): Promise<void> {
   await chrome.storage.local.set({ [LANG_KEY]: lang })
+}
+
+// --- 直近の配色（初回描画のちらつき防止に使用） ---
+
+export async function getCachedPalette(): Promise<Palette | null> {
+  const v = await chrome.storage.local.get(PALETTE_KEY)
+  return (v[PALETTE_KEY] as Palette) ?? null
+}
+
+export async function setCachedPalette(palette: Palette): Promise<void> {
+  await chrome.storage.local.set({ [PALETTE_KEY]: palette })
 }
 
 // --- map 結果（コメント単位メモ）のキャッシュ ---

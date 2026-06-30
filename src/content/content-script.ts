@@ -1,13 +1,28 @@
 // Content script: サイドパネルからの抽出要求・スクロール要求に応答する。
 import { extractPageData } from './extract'
+import { extractTheme } from './theme'
 import { expandHiddenComments } from './expand'
 import type {
   ContentRequest,
   ExtractResponse,
+  ThemeResponse,
 } from '../shared/messages'
 
 chrome.runtime.onMessage.addListener(
   (message: ContentRequest, _sender, sendResponse) => {
+    // テーマだけは重い展開・抽出を待たず即応答する。
+    if (message?.kind === 'extract-theme') {
+      try {
+        sendResponse({ ok: true, theme: extractTheme(document) } satisfies ThemeResponse)
+      } catch (err) {
+        sendResponse({
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        } satisfies ThemeResponse)
+      }
+      return false
+    }
+
     if (message?.kind === 'extract-page-data') {
       // 遅延ロード("Load more")を展開してから抽出する。
       expandHiddenComments()
