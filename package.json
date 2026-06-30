@@ -1,0 +1,24 @@
+{
+  "name": "gh-pr-issue-summary",
+  "version": "0.1.0",
+  "description": "GitHub の issue/PR コメントを Chrome 組み込み AI (Gemini Nano) で要約するサイドパネル拡張",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.7.0",
+    "@types/chrome": "^0.2.0",
+    "@types/dom-chromium-ai": "^0.0.17",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.9"
+  }
+}
