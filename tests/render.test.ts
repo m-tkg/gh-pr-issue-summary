@@ -45,87 +45,61 @@ describe('renderSegments', () => {
     { index: 1, startOrdinal: 3, endOrdinal: 4, commentIds: ['c', 'd'], estTokens: 10 },
   ]
 
-  it('「全体を要約」をリスト外に出し、各範囲は「この範囲を要約」', () => {
-    const states = new Map<number, SegmentViewState>([[1, { status: 'done' }]])
-    const node = renderSegments(segs, states, {
-      onSummarizeAll: () => {},
-      onSummarizeRange: () => {},
-    })
-    expect(node.textContent).toContain('コメント 1〜2')
-    expect(node.textContent).toContain('コメント 3〜4')
-    expect(node.textContent).toContain('要約済み')
+  it('複数範囲でも提供するのは「全体を要約」のみ（部分要約ボタンは出さない）', () => {
+    const node = renderSegments(segs, new Map(), { onSummarizeAll: () => {} })
     const allBtn = node.querySelector('.summarize-all-btn')
     expect(allBtn?.textContent).toBe('全体を要約')
-    // 全体ボタン1 + 範囲ボタン2
-    expect(node.querySelectorAll('button')).toHaveLength(3)
-    const rangeBtns = node.querySelectorAll('.segment-btn')
-    expect(rangeBtns).toHaveLength(2)
-    expect(rangeBtns[0].textContent).toBe('この範囲を要約')
+    expect(node.querySelectorAll('button')).toHaveLength(1)
+    expect(node.querySelectorAll('.segment-btn')).toHaveLength(0)
+  })
+
+  it('複数範囲のときは時間がかかる旨を注記し件数を示す', () => {
+    const node = renderSegments(segs, new Map(), { onSummarizeAll: () => {} })
+    const notice = node.querySelector('.notice')?.textContent ?? ''
+    expect(notice).toContain('時間がかかります')
+    expect(notice).toContain('4 件') // 末尾セグメントの endOrdinal
+  })
+
+  it('単一範囲では注記を出さない', () => {
+    const node = renderSegments([segs[0]], new Map(), {
+      onSummarizeAll: () => {},
+    })
+    expect(node.querySelector('.notice')).toBeNull()
   })
 
   it('「全体を要約」クリックで onSummarizeAll を呼ぶ', () => {
     const onAll = vi.fn()
-    const node = renderSegments(segs, new Map(), {
-      onSummarizeAll: onAll,
-      onSummarizeRange: () => {},
-    })
+    const node = renderSegments(segs, new Map(), { onSummarizeAll: onAll })
     node.querySelector('.summarize-all-btn')!.dispatchEvent(new Event('click'))
     expect(onAll).toHaveBeenCalled()
   })
 
-  it('範囲ボタンクリックで onSummarizeRange に index を渡す', () => {
-    const onRange = vi.fn()
-    const node = renderSegments(segs, new Map(), {
-      onSummarizeAll: () => {},
-      onSummarizeRange: onRange,
-    })
-    node.querySelectorAll('.segment-btn')[1].dispatchEvent(new Event('click'))
-    expect(onRange).toHaveBeenCalledWith(1)
-  })
-
-  it('要約済みの範囲ボタンは disable される', () => {
-    const states = new Map<number, SegmentViewState>([[0, { status: 'done' }]])
-    const node = renderSegments(segs, states, {
-      onSummarizeAll: () => {},
-      onSummarizeRange: () => {},
-    })
-    const rangeBtns = node.querySelectorAll('.segment-btn')
-    expect((rangeBtns[0] as HTMLButtonElement).disabled).toBe(true)
-    expect((rangeBtns[1] as HTMLButtonElement).disabled).toBe(false)
-  })
-
-  it('全範囲が要約済みなら「全体を要約」も disable される', () => {
+  it('全範囲が要約済みなら「全体を要約」は disable', () => {
     const states = new Map<number, SegmentViewState>([
       [0, { status: 'done' }],
       [1, { status: 'done' }],
     ])
-    const node = renderSegments(segs, states, {
-      onSummarizeAll: () => {},
-      onSummarizeRange: () => {},
-    })
+    const node = renderSegments(segs, states, { onSummarizeAll: () => {} })
     expect(
       (node.querySelector('.summarize-all-btn') as HTMLButtonElement).disabled,
     ).toBe(true)
   })
 
-  it('一部のみ要約済みなら「全体を要約」は有効', () => {
-    const states = new Map<number, SegmentViewState>([[0, { status: 'done' }]])
-    const node = renderSegments(segs, states, {
-      onSummarizeAll: () => {},
-      onSummarizeRange: () => {},
-    })
+  it('要約中は「全体を要約」を disable', () => {
+    const states = new Map<number, SegmentViewState>([
+      [0, { status: 'running' }],
+    ])
+    const node = renderSegments(segs, states, { onSummarizeAll: () => {} })
+    expect(
+      (node.querySelector('.summarize-all-btn') as HTMLButtonElement).disabled,
+    ).toBe(true)
+  })
+
+  it('未実行なら「全体を要約」は有効', () => {
+    const node = renderSegments(segs, new Map(), { onSummarizeAll: () => {} })
     expect(
       (node.querySelector('.summarize-all-btn') as HTMLButtonElement).disabled,
     ).toBe(false)
-  })
-
-  it('単一範囲なら「全体を要約」のみで範囲リストは出さない', () => {
-    const node = renderSegments([segs[0]], new Map(), {
-      onSummarizeAll: () => {},
-      onSummarizeRange: () => {},
-    })
-    expect(node.querySelector('.summarize-all-btn')).not.toBeNull()
-    expect(node.querySelectorAll('.segment-btn')).toHaveLength(0)
   })
 })
 

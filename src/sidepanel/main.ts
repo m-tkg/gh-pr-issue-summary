@@ -101,8 +101,7 @@ function renderShell() {
 function renderSegmentList() {
   const existing = document.getElementById('segment-list')
   const node = renderSegments(segments, segmentStates, {
-    onSummarizeAll: () => void onSummarize('all'),
-    onSummarizeRange: (i) => void onSummarize(i),
+    onSummarizeAll: () => void onSummarize(),
   })
   node.id = 'segment-list'
   if (existing) existing.replaceWith(node)
@@ -186,53 +185,38 @@ async function checkModel() {
 /**
  * 要約を実行する。target='all' なら全体、数値ならそのセグメントのみ。
  */
-async function onSummarize(target: 'all' | number) {
+/** スレッド全体を要約する。 */
+async function onSummarize() {
   if (running || !pageData || activeTabId == null) return
   running = true
   try {
-    const isAll = target === 'all'
-    const targetSegments = isAll
-      ? segments
-      : [segments[target as number]]
-    const startOrdinal = targetSegments[0].startOrdinal
-    const endOrdinal = targetSegments[targetSegments.length - 1].endOrdinal
-    const targetComments = pageData.comments.slice(startOrdinal - 1, endOrdinal)
+    const targetComments = pageData.comments
 
-    for (const seg of targetSegments) {
+    for (const seg of segments) {
       segmentStates.set(seg.index, { status: 'running' })
     }
     renderSegmentList()
 
     const total = targetComments.length
-    const rangeLabel =
-      startOrdinal === endOrdinal
-        ? `コメント ${startOrdinal}`
-        : `コメント ${startOrdinal}〜${endOrdinal}`
-    setStatus(`要約を準備中…（${rangeLabel}, 全 ${total} 件）`)
+    setStatus(`要約を準備中…（全 ${total} 件）`)
 
-    const { summary } = await summarize(
-      llm,
-      pageData,
-      targetComments,
-      startOrdinal,
-      {
-        lang,
-        noteCache,
-        onProgress: (done, t, phase) => {
-          if (phase === 'map') {
-            setStatus(`コメント解析中… ${done}/${t}（${rangeLabel}）`)
-          } else {
-            setStatus(`集約中… (${done}/${t})`)
-          }
-        },
+    const { summary } = await summarize(llm, pageData, targetComments, 1, {
+      lang,
+      noteCache,
+      onProgress: (done, t, phase) => {
+        if (phase === 'map') {
+          setStatus(`コメント解析中… ${done}/${t}`)
+        } else {
+          setStatus(`集約中… (${done}/${t})`)
+        }
       },
-    )
+    })
 
-    for (const seg of targetSegments) {
+    for (const seg of segments) {
       segmentStates.set(seg.index, { status: 'done' })
     }
     renderSegmentList()
-    setStatus(`要約完了（${rangeLabel} を対象）。`, 'muted')
+    setStatus(`要約完了（全 ${total} 件）。`, 'muted')
 
     const old = document.getElementById('summary-root')
     const node = renderSummary(summary, scrollToComment)

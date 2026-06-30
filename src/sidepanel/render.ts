@@ -73,61 +73,45 @@ export interface SegmentViewState {
 export interface SegmentHandlers {
   /** スレッド全体を要約する。 */
   onSummarizeAll: () => void
-  /** 指定範囲（セグメント）だけを要約する。 */
-  onSummarizeRange: (segmentIndex: number) => void
 }
 
+/**
+ * 要約の起点 UI を描画する。
+ * コメントが多く複数範囲に分かれる場合でも、要約は「全体を要約」のみを提供し、
+ * 時間がかかる旨を注記する（部分要約 UI は提供しない）。
+ */
 export function renderSegments(
   segments: Segment[],
   states: Map<number, SegmentViewState>,
   handlers: SegmentHandlers,
 ): HTMLElement {
   const wrap = el('div', { class: 'segments' })
-  wrap.append(el('h2', {}, ['コメント範囲']))
   if (segments.length === 0) {
     wrap.append(el('p', { class: 'muted' }, ['コメントはありません。']))
     return wrap
   }
 
-  // 「全体を要約」は分割リストの外（上部）に独立して置く。
-  // 全範囲が要約済みなら disable。
   const allDone = segments.every(
     (seg) => states.get(seg.index)?.status === 'done',
   )
+  const running = segments.some(
+    (seg) => states.get(seg.index)?.status === 'running',
+  )
   const allBtn = el('button', { class: 'summarize-all-btn' }, [
-    allDone ? '全体を要約済み' : '全体を要約',
+    allDone ? '全体を要約済み' : running ? '要約中…' : '全体を要約',
   ]) as HTMLButtonElement
-  allBtn.disabled = allDone
+  allBtn.disabled = allDone || running
   allBtn.addEventListener('click', () => handlers.onSummarizeAll())
   wrap.append(allBtn)
 
+  // 複数範囲に分かれる＝コメントが多い場合は時間がかかる旨を注記。
   if (segments.length > 1) {
+    const totalComments = segments[segments.length - 1].endOrdinal
     wrap.append(
-      el('p', { class: 'muted' }, [
-        `スレッドが長いため ${segments.length} 範囲に分割しました。任意の範囲だけを要約することもできます。`,
+      el('p', { class: 'muted notice' }, [
+        `コメントが多い（${totalComments} 件）ため、全体の要約には時間がかかります。`,
       ]),
     )
-  } else {
-    // 単一範囲なら「全体を要約」で十分なので範囲リストは省略。
-    return wrap
-  }
-
-  for (const seg of segments) {
-    const st = states.get(seg.index)?.status ?? 'pending'
-    const row = el('div', { class: `segment segment-${st}` }, [
-      el('span', { class: 'segment-range' }, [segmentLabel(seg)]),
-      el('span', { class: 'segment-status' }, [
-        st === 'done' ? '要約済み' : st === 'running' ? '要約中…' : '未要約',
-      ]),
-    ])
-    const btn = el('button', { class: 'segment-btn' }, [
-      st === 'done' ? '要約済み' : 'この範囲を要約',
-    ]) as HTMLButtonElement
-    // 要約済み・要約中は再実行不可。
-    btn.disabled = st === 'done' || st === 'running'
-    btn.addEventListener('click', () => handlers.onSummarizeRange(seg.index))
-    row.append(btn)
-    wrap.append(row)
   }
   return wrap
 }
