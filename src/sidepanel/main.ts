@@ -146,14 +146,17 @@ async function applyThemeFast(tabId: number) {
   }
 }
 
+function isGitHubUrl(url: string | undefined): boolean {
+  return !!url && /^https:\/\/github\.com\//.test(url)
+}
+
 async function loadPage() {
   setStatus('ページを読み込み中…')
   const tab = await getActiveTab()
   activeTabId = tab?.id ?? null
-  if (!tab?.id || !tab.url || !/^https:\/\/github\.com\//.test(tab.url)) {
-    pageData = null
-    renderShell()
-    setStatus('GitHub の issue / PR ページを開いてください。')
+  if (!tab?.id || !isGitHubUrl(tab.url)) {
+    // GitHub 以外のタブに移動したら、サイドパネル自体を閉じる。
+    window.close()
     return
   }
 
@@ -277,11 +280,25 @@ async function init() {
   await loadPage()
 }
 
-// タブ切替・URL 変更で再読み込み
-chrome.tabs.onActivated.addListener(() => {
+/** アクティブタブが GitHub 以外ならサイドパネルを閉じる（要約中でも）。 */
+async function closeIfNotGitHub(tabId: number) {
+  try {
+    const tab = await chrome.tabs.get(tabId)
+    if (!isGitHubUrl(tab.url)) window.close()
+  } catch {
+    /* タブ取得失敗は無視 */
+  }
+}
+
+// タブ切替・URL 変更で再読み込み（GitHub 以外へ移動したら閉じる）
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  void closeIfNotGitHub(tabId)
   if (!running) void loadPage()
 })
 chrome.tabs.onUpdated.addListener((tabId, info) => {
+  if (info.url !== undefined && tabId === activeTabId) {
+    void closeIfNotGitHub(tabId)
+  }
   if (info.status === 'complete' && tabId === activeTabId && !running) {
     void loadPage()
   }
