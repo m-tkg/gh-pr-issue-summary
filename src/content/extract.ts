@@ -5,6 +5,8 @@
 // a.author / canonical な issuecomment-<数字> id）に依存する。
 // セレクタが将来壊れた場合の修正範囲をこのファイルに閉じ込める。
 
+import { extractTheme, type Palette } from './theme'
+
 export type IssueType = 'issue' | 'pull'
 export type IssueState = 'open' | 'closed' | 'merged' | 'draft'
 
@@ -42,6 +44,8 @@ export interface PageData {
   body: string
   relationships: Relationships
   comments: CommentData[]
+  /** 表示中の GitHub ページの配色。 */
+  theme: Palette
 }
 
 export interface ParsedUrl {
@@ -208,5 +212,6 @@ export function extractPageData(doc: Document, url: string): PageData | null {
     body: extractBody(doc),
     relationships: extractRelationships(doc),
     comments: extractComments(doc, pathname),
+    theme: extractTheme(doc),
   }
 }

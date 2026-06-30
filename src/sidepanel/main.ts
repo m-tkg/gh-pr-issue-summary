@@ -20,6 +20,7 @@ import {
 } from './storage'
 import {
   el,
+  applyPalette,
   renderHeader,
   renderSegments,
   renderSummary,
@@ -138,6 +139,7 @@ async function loadPage() {
     return
   }
   pageData = res.data
+  applyPalette(pageData.theme)
   segments = planSegments(pageData.comments, DEFAULT_SEGMENT_BUDGET)
   segmentStates.clear()
   clear(resultsRoot)

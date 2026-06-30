@@ -1,8 +1,24 @@
 // サイドパネルの DOM 描画。textContent を用い XSS を避ける。
 
 import type { PageData } from '../content/extract'
+import type { Palette } from '../content/theme'
 import type { Segment } from '../summarize/segment'
 import type { Cluster, FinalSummary, Importance } from '../summarize/types'
+
+/** GitHub ページの配色をサイドパネルの CSS 変数へ反映する。 */
+export function applyPalette(palette: Palette): void {
+  const s = document.documentElement.style
+  s.setProperty('--bg', palette.bg)
+  s.setProperty('--bg-muted', palette.bgMuted)
+  s.setProperty('--fg', palette.fg)
+  s.setProperty('--fg-muted', palette.fgMuted)
+  s.setProperty('--border', palette.border)
+  s.setProperty('--accent', palette.accent)
+  s.setProperty('--state-open', palette.open)
+  s.setProperty('--state-merged', palette.merged)
+  s.setProperty('--state-closed', palette.closed)
+  s.setProperty('--state-draft', palette.draft)
+}
 
 type Attrs = Record<string, string>
 

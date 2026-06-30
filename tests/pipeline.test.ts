@@ -8,6 +8,7 @@ import {
 } from '../src/summarize/pipeline'
 import { truncateToTokens } from '../src/summarize/tokens'
 import type { CommentData, PageData } from '../src/content/extract'
+import { DEFAULT_PALETTE } from '../src/content/theme'
 import type { CommentNote } from '../src/summarize/types'
 
 function comment(id: number, text: string, author = 'alice'): CommentData {
@@ -28,6 +29,7 @@ const page: PageData = {
   body: '本文です',
   relationships: { linkedPRs: [], relatedIssues: [] },
   comments: [],
+  theme: DEFAULT_PALETTE,
 }
 
 describe('truncateToTokens', () => {
