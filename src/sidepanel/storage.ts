@@ -1,0 +1,42 @@
+// chrome.storage.local による設定・キャッシュの薄いラッパ。
+
+import type { CommentNote } from '../summarize/types'
+
+const LANG_KEY = 'outputLanguage'
+
+export const SUPPORTED_LANGUAGES: { code: string; label: string }[] = [
+  { code: 'ja', label: '日本語' },
+  { code: 'en', label: 'English' },
+]
+
+export async function getLanguage(): Promise<string> {
+  const v = await chrome.storage.local.get(LANG_KEY)
+  return typeof v[LANG_KEY] === 'string' ? v[LANG_KEY] : 'ja'
+}
+
+export async function setLanguage(lang: string): Promise<void> {
+  await chrome.storage.local.set({ [LANG_KEY]: lang })
+}
+
+// --- map 結果（コメント単位メモ）のキャッシュ ---
+// コメント本文は基本不変なので id+言語 をキーに再利用する。
+
+function noteKey(commentId: string, lang: string): string {
+  return `note:${lang}:${commentId}`
+}
+
+export async function getCachedNote(
+  commentId: string,
+  lang: string,
+): Promise<CommentNote | null> {
+  const k = noteKey(commentId, lang)
+  const v = await chrome.storage.local.get(k)
+  return (v[k] as CommentNote) ?? null
+}
+
+export async function setCachedNote(
+  note: CommentNote,
+  lang: string,
+): Promise<void> {
+  await chrome.storage.local.set({ [noteKey(note.id, lang)]: note })
+}

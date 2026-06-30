@@ -57,10 +57,17 @@ export interface ProgressCallback {
   (done: number, total: number, phase: 'map' | 'reduce'): void
 }
 
+export interface NoteCache {
+  get(commentId: string, lang: string): Promise<CommentNote | null>
+  set(note: CommentNote, lang: string): Promise<void>
+}
+
 export interface SummarizeOptions {
   lang: string
   onProgress?: ProgressCallback
   signal?: AbortSignal
+  /** map 結果の再利用キャッシュ（任意）。 */
+  noteCache?: NoteCache
 }
 
 /** コメント 1 件を圧縮メモ化する。 */
@@ -106,13 +113,16 @@ export async function mapComments(
 ): Promise<CommentNote[]> {
   const notes: CommentNote[] = []
   for (let i = 0; i < comments.length; i++) {
-    const note = await mapComment(
-      llm,
-      comments[i],
-      startOrdinal + i,
-      opts.lang,
-      opts.signal,
-    )
+    const ordinal = startOrdinal + i
+    const cached = await opts.noteCache?.get(comments[i].id, opts.lang)
+    let note: CommentNote
+    if (cached) {
+      // 序数は対象範囲により変わるため上書きする。
+      note = { ...cached, ordinal }
+    } else {
+      note = await mapComment(llm, comments[i], ordinal, opts.lang, opts.signal)
+      await opts.noteCache?.set(note, opts.lang)
+    }
     notes.push(note)
     opts.onProgress?.(i + 1, comments.length, 'map')
   }

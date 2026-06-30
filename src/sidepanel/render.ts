@@ -1,0 +1,153 @@
+// サイドパネルの DOM 描画。textContent を用い XSS を避ける。
+
+import type { PageData } from '../content/extract'
+import type { Segment } from '../summarize/segment'
+import type { Cluster, FinalSummary, Importance } from '../summarize/types'
+
+type Attrs = Record<string, string>
+
+export function el(
+  tag: string,
+  attrs: Attrs = {},
+  children: (Node | string)[] = [],
+): HTMLElement {
+  const node = document.createElement(tag)
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') node.className = v
+    else node.setAttribute(k, v)
+  }
+  for (const c of children) {
+    node.append(typeof c === 'string' ? document.createTextNode(c) : c)
+  }
+  return node
+}
+
+const IMPORTANCE_LABEL: Record<Importance, string> = {
+  high: '重要',
+  medium: '中',
+  low: '低',
+}
+
+export function renderHeader(page: PageData): HTMLElement {
+  const typeLabel = page.type === 'pull' ? 'PR' : 'Issue'
+  return el('div', { class: 'header' }, [
+    el('div', { class: `state-badge state-${page.state}` }, [
+      page.state.toUpperCase(),
+    ]),
+    el('div', { class: 'header-title' }, [
+      el('span', { class: 'title-text' }, [page.title]),
+      el('span', { class: 'title-meta' }, [
+        ` ${page.repo} ${typeLabel} #${page.number}`,
+      ]),
+    ]),
+  ])
+}
+
+/** 範囲ラベル（例: コメント 19〜37）。 */
+export function segmentLabel(seg: Segment): string {
+  return seg.startOrdinal === seg.endOrdinal
+    ? `コメント ${seg.startOrdinal}`
+    : `コメント ${seg.startOrdinal}〜${seg.endOrdinal}`
+}
+
+export interface SegmentViewState {
+  status: 'pending' | 'running' | 'done'
+}
+
+export function renderSegments(
+  segments: Segment[],
+  states: Map<number, SegmentViewState>,
+  onSummarizeFrom: (segmentIndex: number) => void,
+): HTMLElement {
+  const wrap = el('div', { class: 'segments' })
+  wrap.append(el('h2', {}, ['コメント範囲']))
+  if (segments.length === 0) {
+    wrap.append(el('p', { class: 'muted' }, ['コメントはありません。']))
+    return wrap
+  }
+  if (segments.length > 1) {
+    wrap.append(
+      el('p', { class: 'muted' }, [
+        `スレッドが長いため ${segments.length} 範囲に分割しました。任意の範囲から要約を開始できます。`,
+      ]),
+    )
+  }
+  for (const seg of segments) {
+    const st = states.get(seg.index)?.status ?? 'pending'
+    const row = el('div', { class: `segment segment-${st}` }, [
+      el('span', { class: 'segment-range' }, [segmentLabel(seg)]),
+      el('span', { class: 'segment-status' }, [
+        st === 'done' ? '要約済み' : st === 'running' ? '要約中…' : '未要約',
+      ]),
+    ])
+    const btn = el('button', { class: 'segment-btn' }, [
+      seg.index === 0 ? '全体を要約' : 'ここから末尾まで要約',
+    ])
+    btn.addEventListener('click', () => onSummarizeFrom(seg.index))
+    row.append(btn)
+    wrap.append(row)
+  }
+  return wrap
+}
+
+function renderCluster(
+  cluster: Cluster,
+  onLinkClick: (commentId: string) => void,
+): HTMLElement {
+  const card = el('div', { class: `cluster cluster-${cluster.importance}` }, [
+    el('div', { class: 'cluster-head' }, [
+      el('span', { class: `badge badge-${cluster.importance}` }, [
+        IMPORTANCE_LABEL[cluster.importance],
+      ]),
+      el('span', { class: 'cluster-title' }, [cluster.title]),
+    ]),
+    el('p', { class: 'cluster-summary' }, [cluster.summary]),
+  ])
+  if (cluster.commentUrls.length) {
+    const links = el('div', { class: 'cluster-links' }, [
+      el('span', { class: 'muted' }, ['該当コメント: ']),
+    ])
+    cluster.commentUrls.forEach((url, i) => {
+      const id = url.split('#')[1] ?? ''
+      const a = el('a', { href: url, class: 'comment-link' }, [`#${i + 1}`])
+      a.addEventListener('click', (e) => {
+        e.preventDefault()
+        onLinkClick(id)
+      })
+      links.append(a)
+      links.append(document.createTextNode(' '))
+    })
+    card.append(links)
+  }
+  return card
+}
+
+function section(title: string, body: string): HTMLElement {
+  return el('section', { class: 'summary-section' }, [
+    el('h2', {}, [title]),
+    el('p', {}, [body || '—']),
+  ])
+}
+
+export function renderSummary(
+  summary: FinalSummary,
+  onLinkClick: (commentId: string) => void,
+): HTMLElement {
+  const wrap = el('div', { class: 'summary' })
+  wrap.append(section('概要', summary.overview))
+  wrap.append(section('親・関連', summary.parentAndLinks))
+  wrap.append(section('全体の議論', summary.overallDiscussion))
+  wrap.append(section('現状の進捗', summary.currentProgress))
+
+  const clustersWrap = el('section', { class: 'summary-section' }, [
+    el('h2', {}, [`議論のかたまり (${summary.clusters.length})`]),
+  ])
+  if (summary.clusters.length === 0) {
+    clustersWrap.append(el('p', { class: 'muted' }, ['—']))
+  }
+  for (const c of summary.clusters) {
+    clustersWrap.append(renderCluster(c, onLinkClick))
+  }
+  wrap.append(clustersWrap)
+  return wrap
+}

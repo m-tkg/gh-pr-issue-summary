@@ -5,6 +5,9 @@
 import type { CommentData } from '../content/extract'
 import { estimateTokens } from './tokens'
 
+/** セグメント分割の既定トークン予算（コメント本文ベース）。 */
+export const DEFAULT_SEGMENT_BUDGET = 4000
+
 export interface Segment {
   /** 0 始まりのセグメント番号。 */
   index: number
