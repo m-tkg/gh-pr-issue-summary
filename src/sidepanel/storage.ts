@@ -33,9 +33,11 @@ export async function setCachedPalette(palette: Palette): Promise<void> {
 
 // --- map 結果（コメント単位メモ）のキャッシュ ---
 // コメント本文は基本不変なので id+言語 をキーに再利用する。
+// メモの構造（フィールド追加など）を変えたら版を上げて旧キャッシュを無効化する。
+const NOTE_CACHE_VERSION = 'v2' // v2: timestampISO を保持
 
 function noteKey(commentId: string, lang: string): string {
-  return `note:${lang}:${commentId}`
+  return `note:${NOTE_CACHE_VERSION}:${lang}:${commentId}`
 }
 
 export async function getCachedNote(
