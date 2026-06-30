@@ -4,6 +4,7 @@ import type { CommentData, PageData } from '../content/extract'
 import type { LlmClient } from './llmClient'
 import type {
   Cluster,
+  ClusterComment,
   CommentKind,
   CommentNote,
   FinalSummary,
@@ -94,6 +95,7 @@ export async function mapComment(
       id: comment.id,
       url: comment.permalink,
       author: comment.author,
+      timestampISO: comment.timestampISO,
       gist: String(obj.gist ?? ''),
       kind: coerceKind(obj.kind),
       importance: coerceImportance(obj.importance),
@@ -129,14 +131,26 @@ export async function mapComments(
   return notes
 }
 
-function refsToUrls(refs: unknown, byOrdinal: Map<number, CommentNote>): string[] {
+function refsToComments(
+  refs: unknown,
+  byOrdinal: Map<number, CommentNote>,
+): ClusterComment[] {
   if (!Array.isArray(refs)) return []
-  const urls: string[] = []
+  const seen = new Set<string>()
+  const out: ClusterComment[] = []
   for (const r of refs) {
     const note = byOrdinal.get(Number(r))
-    if (note && !urls.includes(note.url)) urls.push(note.url)
+    if (!note || seen.has(note.url)) continue
+    seen.add(note.url)
+    out.push({
+      url: note.url,
+      ordinal: note.ordinal,
+      author: note.author,
+      timestampISO: note.timestampISO,
+    })
   }
-  return urls
+  // 序数の昇順で並べる。
+  return out.sort((a, b) => a.ordinal - b.ordinal)
 }
 
 function parseClusters(
@@ -148,13 +162,16 @@ function parseClusters(
     title: String(c.title ?? ''),
     summary: String(c.summary ?? ''),
     importance: coerceImportance(c.importance),
-    commentUrls: refsToUrls(c.commentRefs, byOrdinal),
+    comments: refsToComments(c.commentRefs, byOrdinal),
   }))
-  // importance 降順で安定ソート。
-  const rank: Record<Importance, number> = { high: 0, medium: 1, low: 2 }
+  // 議論のかたまりを時系列に並べる（各クラスタの最早コメント序数の昇順）。
+  // 部分要約を任意の順で実行しても、表示は常に時系列になる。
+  // 該当コメントが無いクラスタは末尾へ。元の順序を保つ安定ソート。
+  const earliest = (c: Cluster) =>
+    c.comments.length ? c.comments[0].ordinal : Number.POSITIVE_INFINITY
   return clusters
     .map((c, i) => ({ c, i }))
-    .sort((a, b) => rank[a.c.importance] - rank[b.c.importance] || a.i - b.i)
+    .sort((a, b) => earliest(a.c) - earliest(b.c) || a.i - b.i)
     .map(({ c }) => c)
 }
 

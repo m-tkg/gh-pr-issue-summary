@@ -72,7 +72,7 @@ export function reducePrompt(
     `- clusters: 議論のかたまり（複数の論点があればまとまりごとに分割）。`,
     `  各 cluster は title / summary / importance / commentRefs を持つ。`,
     `  commentRefs には、その論点に関係するコメントの [番号] を整数配列で列挙する。`,
-    `  重要度(importance)の高い cluster を先に並べる。`,
+    `  importance は high / medium / low で各 cluster の重要度を示す。`,
     '',
     `参考（issue/PR 本文の冒頭）:`,
     truncateToTokens(page.body, 400),

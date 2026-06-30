@@ -90,7 +90,14 @@ export function renderSegments(
   }
 
   // 「全体を要約」は分割リストの外（上部）に独立して置く。
-  const allBtn = el('button', { class: 'summarize-all-btn' }, ['全体を要約'])
+  // 全範囲が要約済みなら disable。
+  const allDone = segments.every(
+    (seg) => states.get(seg.index)?.status === 'done',
+  )
+  const allBtn = el('button', { class: 'summarize-all-btn' }, [
+    allDone ? '全体を要約済み' : '全体を要約',
+  ]) as HTMLButtonElement
+  allBtn.disabled = allDone
   allBtn.addEventListener('click', () => handlers.onSummarizeAll())
   wrap.append(allBtn)
 
@@ -113,12 +120,25 @@ export function renderSegments(
         st === 'done' ? '要約済み' : st === 'running' ? '要約中…' : '未要約',
       ]),
     ])
-    const btn = el('button', { class: 'segment-btn' }, ['この範囲を要約'])
+    const btn = el('button', { class: 'segment-btn' }, [
+      st === 'done' ? '要約済み' : 'この範囲を要約',
+    ]) as HTMLButtonElement
+    // 要約済み・要約中は再実行不可。
+    btn.disabled = st === 'done' || st === 'running'
     btn.addEventListener('click', () => handlers.onSummarizeRange(seg.index))
     row.append(btn)
     wrap.append(row)
   }
   return wrap
+}
+
+/** ISO8601 を "YYYY-MM-DD HH:mm" に整形（不正/空なら ''）。 */
+export function formatDate(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
 function renderCluster(
@@ -134,21 +154,29 @@ function renderCluster(
     ]),
     el('p', { class: 'cluster-summary' }, [cluster.summary]),
   ])
-  if (cluster.commentUrls.length) {
-    const links = el('div', { class: 'cluster-links' }, [
-      el('span', { class: 'muted' }, ['該当コメント: ']),
-    ])
-    cluster.commentUrls.forEach((url, i) => {
-      const id = url.split('#')[1] ?? ''
-      const a = el('a', { href: url, class: 'comment-link' }, [`#${i + 1}`])
+  if (cluster.comments.length) {
+    // デフォルト折りたたみ（open 属性なし）。
+    const details = el('details', { class: 'cluster-comments' })
+    details.append(
+      el('summary', {}, [`該当コメント (${cluster.comments.length})`]),
+    )
+    for (const c of cluster.comments) {
+      const id = c.url.split('#')[1] ?? ''
+      const a = el('a', { href: c.url, class: 'comment-link' }, [
+        `#${c.ordinal}`,
+      ])
       a.addEventListener('click', (e) => {
         e.preventDefault()
         onLinkClick(id)
       })
-      links.append(a)
-      links.append(document.createTextNode(' '))
-    })
-    card.append(links)
+      const meta = [formatDate(c.timestampISO), c.author]
+        .filter(Boolean)
+        .join(' ・ ')
+      const line = el('div', { class: 'comment-line' }, [a])
+      if (meta) line.append(document.createTextNode(` ${meta}`))
+      details.append(line)
+    }
+    card.append(details)
   }
   return card
 }

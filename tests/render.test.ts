@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   segmentLabel,
+  formatDate,
   renderSegments,
   renderSummary,
   type SegmentViewState,
@@ -23,6 +24,18 @@ describe('segmentLabel', () => {
     expect(
       segmentLabel({ index: 0, startOrdinal: 5, endOrdinal: 5, commentIds: [], estTokens: 0 }),
     ).toBe('コメント 5')
+  })
+})
+
+describe('formatDate', () => {
+  it('ISO を YYYY-MM-DD HH:mm 形式にする', () => {
+    expect(formatDate('2020-05-04T02:06:39.000Z')).toMatch(
+      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/,
+    )
+  })
+  it('空・不正は空文字', () => {
+    expect(formatDate(undefined)).toBe('')
+    expect(formatDate('not-a-date')).toBe('')
   })
 })
 
@@ -70,6 +83,42 @@ describe('renderSegments', () => {
     expect(onRange).toHaveBeenCalledWith(1)
   })
 
+  it('要約済みの範囲ボタンは disable される', () => {
+    const states = new Map<number, SegmentViewState>([[0, { status: 'done' }]])
+    const node = renderSegments(segs, states, {
+      onSummarizeAll: () => {},
+      onSummarizeRange: () => {},
+    })
+    const rangeBtns = node.querySelectorAll('.segment-btn')
+    expect((rangeBtns[0] as HTMLButtonElement).disabled).toBe(true)
+    expect((rangeBtns[1] as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('全範囲が要約済みなら「全体を要約」も disable される', () => {
+    const states = new Map<number, SegmentViewState>([
+      [0, { status: 'done' }],
+      [1, { status: 'done' }],
+    ])
+    const node = renderSegments(segs, states, {
+      onSummarizeAll: () => {},
+      onSummarizeRange: () => {},
+    })
+    expect(
+      (node.querySelector('.summarize-all-btn') as HTMLButtonElement).disabled,
+    ).toBe(true)
+  })
+
+  it('一部のみ要約済みなら「全体を要約」は有効', () => {
+    const states = new Map<number, SegmentViewState>([[0, { status: 'done' }]])
+    const node = renderSegments(segs, states, {
+      onSummarizeAll: () => {},
+      onSummarizeRange: () => {},
+    })
+    expect(
+      (node.querySelector('.summarize-all-btn') as HTMLButtonElement).disabled,
+    ).toBe(false)
+  })
+
   it('単一範囲なら「全体を要約」のみで範囲リストは出さない', () => {
     const node = renderSegments([segs[0]], new Map(), {
       onSummarizeAll: () => {},
@@ -91,7 +140,19 @@ describe('renderSummary', () => {
         title: '論点A',
         summary: 'Aの要約',
         importance: 'high',
-        commentUrls: ['/r/r/issues/1#issuecomment-10'],
+        comments: [
+          {
+            url: '/r/r/issues/1#issuecomment-10',
+            ordinal: 3,
+            author: 'alice',
+            timestampISO: '2020-05-04T02:06:39.000Z',
+          },
+          {
+            url: '/r/r/issues/1#issuecomment-20',
+            ordinal: 7,
+            author: 'bob',
+          },
+        ],
       },
     ],
   }
@@ -103,6 +164,28 @@ describe('renderSummary', () => {
     expect(t).toContain('議論の流れ')
     expect(t).toContain('論点A')
     expect(t).toContain('議論のかたまり (1)')
+  })
+
+  it('該当コメントはデフォルト折りたたみ(details, open無し)', () => {
+    const node = renderSummary(summary, () => {})
+    const details = node.querySelector('details.cluster-comments') as HTMLDetailsElement
+    expect(details).not.toBeNull()
+    expect(details.open).toBe(false)
+    expect(details.querySelector('summary')?.textContent).toBe('該当コメント (2)')
+  })
+
+  it('1行1リンクで番号・日時・投稿者を表示する', () => {
+    const node = renderSummary(summary, () => {})
+    const lines = node.querySelectorAll('.comment-line')
+    expect(lines).toHaveLength(2)
+    expect(lines[0].querySelector('a.comment-link')?.textContent).toBe('#3')
+    // タイムゾーン非依存に日時フォーマットの形だけ検証
+    expect(lines[0].textContent).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/)
+    expect(lines[0].textContent).toContain('alice')
+    // 日時が無い場合は投稿者のみ（日時文字列は出ない）
+    expect(lines[1].textContent).toContain('#7')
+    expect(lines[1].textContent).toContain('bob')
+    expect(lines[1].textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/)
   })
 
   it('コメントリンクのクリックで commentId を渡す', () => {

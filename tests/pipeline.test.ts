@@ -98,7 +98,7 @@ describe('reduceNotes', () => {
     },
   ]
 
-  it('clusters の commentRefs を permalink に変換し importance 降順で並べる', async () => {
+  it('clusters の commentRefs を permalink に変換し時系列(最早序数)順に並べる', async () => {
     const llm = new MockLlmClient(() =>
       JSON.stringify({
         overview: '概要',
@@ -117,16 +117,39 @@ describe('reduceNotes', () => {
     )
     const result = await reduceNotes(llm, notes, page, { lang: 'ja' })
     expect(result.overview).toBe('概要')
-    // importance 降順 → 高 が先頭
+    // 時系列(最早序数) → 高(最早=1) が先頭、低(最早=2) が後
     expect(result.clusters[0].title).toBe('高')
-    expect(result.clusters[0].commentUrls).toEqual([
+    expect(result.clusters[0].comments.map((c) => c.url)).toEqual([
       '/r/r/issues/1#issuecomment-1',
       '/r/r/issues/1#issuecomment-2',
     ])
+    // 序数・投稿者も保持
+    expect(result.clusters[0].comments[0]).toMatchObject({
+      ordinal: 1,
+      author: 'a',
+    })
     // 存在しない参照 999 は無視される
-    expect(result.clusters[1].commentUrls).toEqual([
+    expect(result.clusters[1].comments.map((c) => c.url)).toEqual([
       '/r/r/issues/1#issuecomment-2',
     ])
+  })
+
+  it('importance より時系列を優先（高重要でも後のコメントなら後ろ）', async () => {
+    const llm = new MockLlmClient(() =>
+      JSON.stringify({
+        overview: 'o',
+        overallDiscussion: 'd',
+        currentProgress: 'p',
+        clusters: [
+          // 高重要だが参照は後のコメント(2)
+          { title: '高・後', summary: 's', importance: 'high', commentRefs: [2] },
+          // 低重要だが参照は先のコメント(1)
+          { title: '低・先', summary: 's', importance: 'low', commentRefs: [1] },
+        ],
+      }),
+    )
+    const result = await reduceNotes(llm, notes, page, { lang: 'ja' })
+    expect(result.clusters.map((c) => c.title)).toEqual(['低・先', '高・後'])
   })
 
   it('parentAndLinks は関連情報から決定的に生成される', async () => {
@@ -191,7 +214,7 @@ describe('reduceNotes 階層 reduce', () => {
     expect(batchReduces).toBeGreaterThan(1) // 複数バッチに分割された
     expect(merges).toBe(1) // 統合が 1 回
     expect(result.overview).toBe('統合概要')
-    expect(result.clusters[0].commentUrls).toEqual([
+    expect(result.clusters[0].comments.map((c) => c.url)).toEqual([
       '/r/r/issues/1#issuecomment-1',
       '/r/r/issues/1#issuecomment-5',
     ])
@@ -235,7 +258,7 @@ describe('summarize (map→reduce 結合)', () => {
     })
     expect(notes).toHaveLength(2)
     expect(mapDone).toBe(2)
-    expect(summary.clusters[0].commentUrls).toHaveLength(2)
+    expect(summary.clusters[0].comments).toHaveLength(2)
     // map は 1 コメント 1 セッション
     expect(llm.createdSessions).toBe(3) // map×2 + reduce×1
   })

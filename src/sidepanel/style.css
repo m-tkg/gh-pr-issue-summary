@@ -104,8 +104,13 @@ h2 {
   font-weight: 600;
   margin-bottom: 10px;
 }
-.summarize-all-btn:hover {
+.summarize-all-btn:hover:not(:disabled) {
   filter: brightness(0.93);
+}
+.summarize-all-btn:disabled,
+.segment-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 /* セグメント */
@@ -144,7 +149,7 @@ h2 {
   padding: 4px 10px;
   font-size: 12px;
 }
-.segment-btn:hover {
+.segment-btn:hover:not(:disabled) {
   filter: brightness(0.95);
 }
 
@@ -195,13 +200,27 @@ h2 {
   background: var(--state-draft);
   opacity: 0.7;
 }
-.cluster-links {
+.cluster-comments {
   font-size: 12px;
+  margin-top: 4px;
+}
+.cluster-comments > summary {
+  cursor: pointer;
+  color: var(--fg-muted);
+  user-select: none;
+}
+.comment-line {
+  padding: 2px 0 2px 12px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .comment-link {
   color: var(--accent);
   text-decoration: none;
-  margin-right: 2px;
+  margin-right: 4px;
+  font-weight: 600;
 }
 .comment-link:hover {
   text-decoration: underline;

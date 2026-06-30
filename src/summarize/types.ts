@@ -18,10 +18,22 @@ export interface CommentNote {
   id: string
   url: string
   author: string
+  /** ISO8601 のタイムスタンプ（取得できれば）。 */
+  timestampISO?: string
   gist: string
   kind: CommentKind
   importance: Importance
   stance?: string
+}
+
+/** クラスタが参照するコメント。 */
+export interface ClusterComment {
+  url: string
+  /** スレッド内 1 始まり序数。 */
+  ordinal: number
+  author: string
+  /** ISO8601 のタイムスタンプ（取得できれば）。 */
+  timestampISO?: string
 }
 
 /** 議論のかたまり。 */
@@ -29,8 +41,8 @@ export interface Cluster {
   title: string
   summary: string
   importance: Importance
-  /** 該当コメントへのパーマリンク一覧。 */
-  commentUrls: string[]
+  /** 該当コメント一覧（序数・投稿者・日時付き）。 */
+  comments: ClusterComment[]
 }
 
 /** 最終要約結果。 */
