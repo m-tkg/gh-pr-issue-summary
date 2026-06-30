@@ -62,6 +62,29 @@ function sendToTab<T>(tabId: number, message: ContentRequest): Promise<T> {
   return chrome.tabs.sendMessage(tabId, message)
 }
 
+/** content script を対象タブへ動的に注入する（既存タブでも再読み込み不要にする）。 */
+async function ensureContentScript(tabId: number): Promise<void> {
+  const files = chrome.runtime.getManifest().content_scripts?.[0]?.js ?? []
+  if (files.length === 0) return
+  await chrome.scripting.executeScript({ target: { tabId }, files })
+}
+
+/**
+ * content script へ送信。未注入で失敗したら注入して 1 度だけ再試行する。
+ * これにより「ページと通信できませんでした」を、ページ再読み込みなしで自動復旧する。
+ */
+async function sendToTabResilient<T>(
+  tabId: number,
+  message: ContentRequest,
+): Promise<T> {
+  try {
+    return await sendToTab<T>(tabId, message)
+  } catch {
+    await ensureContentScript(tabId)
+    return await sendToTab<T>(tabId, message)
+  }
+}
+
 function scrollToComment(commentId: string) {
   if (activeTabId == null) return
   sendToTab(activeTabId, { kind: 'scroll-to-comment', commentId }).catch(
@@ -111,7 +134,9 @@ function renderSegmentList() {
 /** テーマだけを軽量に取得して即適用・キャッシュする。 */
 async function applyThemeFast(tabId: number) {
   try {
-    const res = await sendToTab<ThemeResponse>(tabId, { kind: 'extract-theme' })
+    const res = await sendToTabResilient<ThemeResponse>(tabId, {
+      kind: 'extract-theme',
+    })
     if (res.ok) {
       applyPalette(res.theme)
       void setCachedPalette(res.theme)
@@ -137,11 +162,14 @@ async function loadPage() {
 
   let res: ExtractResponse
   try {
-    res = await sendToTab<ExtractResponse>(tab.id, { kind: 'extract-page-data' })
+    // content script 未注入でも自動注入して再試行する（再読み込み不要）。
+    res = await sendToTabResilient<ExtractResponse>(tab.id, {
+      kind: 'extract-page-data',
+    })
   } catch {
     renderShell()
     setStatus(
-      'ページと通信できませんでした。GitHub ページを再読み込みしてから、もう一度お試しください。',
+      'ページと通信できませんでした。ツールバーから拡張を一度開き直すか、GitHub ページを再読み込みしてお試しください。',
       'error',
     )
     return
