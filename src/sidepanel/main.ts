@@ -96,7 +96,10 @@ function renderShell() {
 
 function renderSegmentList() {
   const existing = document.getElementById('segment-list')
-  const node = renderSegments(segments, segmentStates, onSummarizeFrom)
+  const node = renderSegments(segments, segmentStates, {
+    onSummarizeAll: () => void onSummarize('all'),
+    onSummarizeRange: (i) => void onSummarize(i),
+  })
   node.id = 'segment-list'
   if (existing) existing.replaceWith(node)
   else resultsRoot.append(node)
@@ -159,53 +162,56 @@ async function checkModel() {
   }
 }
 
-async function onSummarizeFrom(segmentIndex: number) {
+/**
+ * 要約を実行する。target='all' なら全体、数値ならそのセグメントのみ。
+ */
+async function onSummarize(target: 'all' | number) {
   if (running || !pageData || activeTabId == null) return
   running = true
   try {
-    const startSeg = segments[segmentIndex]
-    const startIdx = startSeg.startOrdinal - 1
-    const targetComments = pageData.comments.slice(startIdx)
+    const isAll = target === 'all'
+    const targetSegments = isAll
+      ? segments
+      : [segments[target as number]]
+    const startOrdinal = targetSegments[0].startOrdinal
+    const endOrdinal = targetSegments[targetSegments.length - 1].endOrdinal
+    const targetComments = pageData.comments.slice(startOrdinal - 1, endOrdinal)
 
-    // 対象範囲のセグメント状態を「要約中」に
-    for (const seg of segments) {
-      if (seg.index >= segmentIndex) {
-        segmentStates.set(seg.index, { status: 'running' })
-      }
+    for (const seg of targetSegments) {
+      segmentStates.set(seg.index, { status: 'running' })
     }
     renderSegmentList()
 
     const total = targetComments.length
-    setStatus(`要約を準備中…（コメント ${startSeg.startOrdinal}〜末尾, 全 ${total} 件）`)
+    const rangeLabel =
+      startOrdinal === endOrdinal
+        ? `コメント ${startOrdinal}`
+        : `コメント ${startOrdinal}〜${endOrdinal}`
+    setStatus(`要約を準備中…（${rangeLabel}, 全 ${total} 件）`)
 
     const { summary } = await summarize(
       llm,
       pageData,
       targetComments,
-      startSeg.startOrdinal,
+      startOrdinal,
       {
         lang,
         noteCache,
         onProgress: (done, t, phase) => {
           if (phase === 'map') {
-            setStatus(`コメント解析中… ${done}/${t}`)
+            setStatus(`コメント解析中… ${done}/${t}（${rangeLabel}）`)
           } else {
-            setStatus(`全体を集約中… (${done}/${t})`)
+            setStatus(`集約中… (${done}/${t})`)
           }
         },
       },
     )
 
-    for (const seg of segments) {
-      if (seg.index >= segmentIndex) {
-        segmentStates.set(seg.index, { status: 'done' })
-      }
+    for (const seg of targetSegments) {
+      segmentStates.set(seg.index, { status: 'done' })
     }
     renderSegmentList()
-    setStatus(
-      `要約完了（コメント ${startSeg.startOrdinal}〜${pageData.comments.length} を対象）。`,
-      'muted',
-    )
+    setStatus(`要約完了（${rangeLabel} を対象）。`, 'muted')
 
     const old = document.getElementById('summary-root')
     const node = renderSummary(summary, scrollToComment)

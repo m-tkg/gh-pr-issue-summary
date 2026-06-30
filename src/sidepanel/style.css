@@ -72,6 +72,23 @@ h2 {
 .segments {
   margin-top: 8px;
 }
+.summarize-all-btn {
+  display: block;
+  width: 100%;
+  cursor: pointer;
+  border: 1px solid #1a7f37;
+  background: #1a7f37;
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.summarize-all-btn:hover {
+  background: #176f30;
+}
+
 .segment {
   display: flex;
   align-items: center;

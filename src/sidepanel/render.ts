@@ -54,10 +54,17 @@ export interface SegmentViewState {
   status: 'pending' | 'running' | 'done'
 }
 
+export interface SegmentHandlers {
+  /** スレッド全体を要約する。 */
+  onSummarizeAll: () => void
+  /** 指定範囲（セグメント）だけを要約する。 */
+  onSummarizeRange: (segmentIndex: number) => void
+}
+
 export function renderSegments(
   segments: Segment[],
   states: Map<number, SegmentViewState>,
-  onSummarizeFrom: (segmentIndex: number) => void,
+  handlers: SegmentHandlers,
 ): HTMLElement {
   const wrap = el('div', { class: 'segments' })
   wrap.append(el('h2', {}, ['コメント範囲']))
@@ -65,13 +72,23 @@ export function renderSegments(
     wrap.append(el('p', { class: 'muted' }, ['コメントはありません。']))
     return wrap
   }
+
+  // 「全体を要約」は分割リストの外（上部）に独立して置く。
+  const allBtn = el('button', { class: 'summarize-all-btn' }, ['全体を要約'])
+  allBtn.addEventListener('click', () => handlers.onSummarizeAll())
+  wrap.append(allBtn)
+
   if (segments.length > 1) {
     wrap.append(
       el('p', { class: 'muted' }, [
-        `スレッドが長いため ${segments.length} 範囲に分割しました。任意の範囲から要約を開始できます。`,
+        `スレッドが長いため ${segments.length} 範囲に分割しました。任意の範囲だけを要約することもできます。`,
       ]),
     )
+  } else {
+    // 単一範囲なら「全体を要約」で十分なので範囲リストは省略。
+    return wrap
   }
+
   for (const seg of segments) {
     const st = states.get(seg.index)?.status ?? 'pending'
     const row = el('div', { class: `segment segment-${st}` }, [
@@ -80,10 +97,8 @@ export function renderSegments(
         st === 'done' ? '要約済み' : st === 'running' ? '要約中…' : '未要約',
       ]),
     ])
-    const btn = el('button', { class: 'segment-btn' }, [
-      seg.index === 0 ? '全体を要約' : 'ここから末尾まで要約',
-    ])
-    btn.addEventListener('click', () => onSummarizeFrom(seg.index))
+    const btn = el('button', { class: 'segment-btn' }, ['この範囲を要約'])
+    btn.addEventListener('click', () => handlers.onSummarizeRange(seg.index))
     row.append(btn)
     wrap.append(row)
   }
