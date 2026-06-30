@@ -10,7 +10,7 @@ export default defineManifest({
   permissions: ['sidePanel', 'storage', 'scripting', 'activeTab'],
   host_permissions: ['https://github.com/*'],
   background: {
-    service_worker: 'src/background/index.ts',
+    service_worker: 'src/background/service-worker.ts',
     type: 'module',
   },
   action: {
@@ -22,7 +22,7 @@ export default defineManifest({
   content_scripts: [
     {
       matches: ['https://github.com/*'],
-      js: ['src/content/index.ts'],
+      js: ['src/content/content-script.ts'],
       run_at: 'document_idle',
     },
   ],
