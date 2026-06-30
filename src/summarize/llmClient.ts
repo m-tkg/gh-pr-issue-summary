@@ -59,11 +59,12 @@ export function buildCreateOptions(
 
 /** グローバルが Prompt API を備えているかを判定する。 */
 export function isLanguageModelSupported(candidate: unknown): boolean {
-  return (
-    typeof candidate === 'object' &&
-    candidate !== null &&
-    typeof (candidate as { create?: unknown }).create === 'function'
-  )
+  // LanguageModel はクラス（typeof === 'function'）。名前空間オブジェクトの
+  // 可能性も考慮し function/object の両方を許容する。
+  if (candidate == null) return false
+  const t = typeof candidate
+  if (t !== 'function' && t !== 'object') return false
+  return typeof (candidate as { create?: unknown }).create === 'function'
 }
 
 // --- Chrome 実装 ---

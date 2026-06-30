@@ -32,4 +32,16 @@ describe('isLanguageModelSupported', () => {
   it('create を持つオブジェクトなら true', () => {
     expect(isLanguageModelSupported({ create: () => {} })).toBe(true)
   })
+
+  it('create を静的メソッドに持つクラス(typeof function)でも true', () => {
+    // 実際の LanguageModel はクラス（typeof === "function"）。
+    class FakeLanguageModel {
+      static create() {}
+    }
+    expect(isLanguageModelSupported(FakeLanguageModel)).toBe(true)
+  })
+
+  it('create を持たない関数は false', () => {
+    expect(isLanguageModelSupported(() => {})).toBe(false)
+  })
 })
