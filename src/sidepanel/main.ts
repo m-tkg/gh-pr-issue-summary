@@ -227,9 +227,13 @@ function renderShell() {
 
 function renderSegmentList() {
   const existing = document.getElementById('segment-list')
-  const node = renderSegments(segments, segmentStates, {
-    onSummarizeAll: () => void onSummarize(),
-  })
+  const node = renderSegments(
+    segments,
+    segmentStates,
+    { onSummarizeAll: () => void onSummarize() },
+    // 分割注記は Gemini Nano のときだけ（CLI は 1 回で要約するため分割しない）。
+    backend === 'chrome',
+  )
   node.id = 'segment-list'
   if (existing) existing.replaceWith(node)
   else resultsRoot.append(node)
@@ -347,7 +351,7 @@ async function checkModel() {
       'モデルの準備が必要です。要約を開始すると初回ダウンロードが行われます（時間がかかる場合があります）。',
     )
   } else {
-    setStatus(`コメント ${pageData?.comments.length ?? 0} 件。要約を開始してください。`)
+    setStatus('要約を開始してください。')
   }
 }
 
@@ -363,14 +367,13 @@ async function onSummarize() {
     }
     renderSegmentList()
 
-    const total = targetComments.length
-    setStatus(`要約を準備中…（全 ${total} 件）`)
+    setStatus('要約を準備中…')
 
     let summary
     if (backend === 'cli') {
       // 大コンテキストの CLI は 1 回で要約。
       setStatus(
-        `ローカル CLI (${cli}${model ? ` / ${model}` : ''}) で要約中…（全 ${total} 件、しばらくお待ちください）`,
+        `ローカル CLI (${cli}${model ? ` / ${model}` : ''}) で要約中…（しばらくお待ちください）`,
       )
       ;({ summary } = await summarizeSingleShot(llm, pageData, targetComments, {
         lang,
@@ -394,13 +397,13 @@ async function onSummarize() {
       segmentStates.set(seg.index, { status: 'done' })
     }
     renderSegmentList()
-    setStatus(`要約完了（全 ${total} 件）。`, 'muted')
+    setStatus('要約完了。', 'muted')
 
     renderSummaryInto(summary)
     // ページ単位でキャッシュ（再訪時に前回結果を表示）。
     await setCachedSummary(pageKey(pageData), lang, {
       summary,
-      commentCount: total,
+      commentCount: targetComments.length,
       savedAt: Date.now(),
     })
   } catch (err) {

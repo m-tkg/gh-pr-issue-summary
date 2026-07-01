@@ -82,8 +82,10 @@ export interface SegmentHandlers {
  */
 export function renderSegments(
   segments: Segment[],
-  _states: Map<number, SegmentViewState>,
+  states: Map<number, SegmentViewState>,
   handlers: SegmentHandlers,
+  /** 量が多い旨の分割注記を出すか（Gemini Nano のときだけ true）。 */
+  showSplitNotice = false,
 ): HTMLElement {
   const wrap = el('div', { class: 'segments' })
   if (segments.length === 0) {
@@ -91,17 +93,22 @@ export function renderSegments(
     return wrap
   }
 
-  // 全体を要約ボタンは常に押せる（disable しない。進捗はステータス行に表示）。
-  const allBtn = el('button', { class: 'summarize-all-btn' }, ['全体を要約'])
+  // 要約中だけ disable する。
+  const running = segments.some(
+    (seg) => states.get(seg.index)?.status === 'running',
+  )
+  const allBtn = el('button', { class: 'summarize-all-btn' }, [
+    '全体を要約',
+  ]) as HTMLButtonElement
+  allBtn.disabled = running
   allBtn.addEventListener('click', () => handlers.onSummarizeAll())
   wrap.append(allBtn)
 
-  // 複数範囲に分かれる＝コメントが多い場合は時間がかかる旨を注記。
-  if (segments.length > 1) {
-    const totalComments = segments[segments.length - 1].endOrdinal
+  // 量が多く分割される場合の注記（Nano のみ）。
+  if (showSplitNotice && segments.length > 1) {
     wrap.append(
       el('p', { class: 'muted notice' }, [
-        `コメントが多い（${totalComments} 件）ため、全体の要約には時間がかかります。`,
+        'コメントが多いため、全体の要約には時間がかかります。',
       ]),
     )
   }

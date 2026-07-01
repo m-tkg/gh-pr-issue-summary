@@ -53,17 +53,18 @@ describe('renderSegments', () => {
     expect(node.querySelectorAll('.segment-btn')).toHaveLength(0)
   })
 
-  it('複数範囲のときは時間がかかる旨を注記し件数を示す', () => {
-    const node = renderSegments(segs, new Map(), { onSummarizeAll: () => {} })
-    const notice = node.querySelector('.notice')?.textContent ?? ''
+  it('分割注記は showSplitNotice=true のときだけ出し、件数は出さない', () => {
+    const on = renderSegments(segs, new Map(), { onSummarizeAll: () => {} }, true)
+    const notice = on.querySelector('.notice')?.textContent ?? ''
     expect(notice).toContain('時間がかかります')
-    expect(notice).toContain('4 件') // 末尾セグメントの endOrdinal
+    expect(notice).not.toMatch(/\d+\s*件/)
+
+    const off = renderSegments(segs, new Map(), { onSummarizeAll: () => {} }, false)
+    expect(off.querySelector('.notice')).toBeNull()
   })
 
   it('単一範囲では注記を出さない', () => {
-    const node = renderSegments([segs[0]], new Map(), {
-      onSummarizeAll: () => {},
-    })
+    const node = renderSegments([segs[0]], new Map(), { onSummarizeAll: () => {} }, true)
     expect(node.querySelector('.notice')).toBeNull()
   })
 
@@ -74,17 +75,23 @@ describe('renderSegments', () => {
     expect(onAll).toHaveBeenCalled()
   })
 
-  it('「全体を要約」は常に disable しない（要約済み/要約中でも押せる）', () => {
-    const cases: SegmentViewState['status'][] = ['done', 'running', 'pending']
-    for (const status of cases) {
+  it('要約中だけ disable。要約済み/未実行は押せる', () => {
+    const running = new Map<number, SegmentViewState>([[0, { status: 'running' }]])
+    expect(
+      (renderSegments(segs, running, { onSummarizeAll: () => {} }).querySelector(
+        '.summarize-all-btn',
+      ) as HTMLButtonElement).disabled,
+    ).toBe(true)
+
+    for (const status of ['done', 'pending'] as const) {
       const states = new Map<number, SegmentViewState>([
         [0, { status }],
         [1, { status }],
       ])
-      const node = renderSegments(segs, states, { onSummarizeAll: () => {} })
-      const btn = node.querySelector('.summarize-all-btn') as HTMLButtonElement
+      const btn = renderSegments(segs, states, {
+        onSummarizeAll: () => {},
+      }).querySelector('.summarize-all-btn') as HTMLButtonElement
       expect(btn.disabled).toBe(false)
-      expect(btn.textContent).toBe('全体を要約')
     }
   })
 })
