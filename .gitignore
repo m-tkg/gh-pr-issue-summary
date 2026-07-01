@@ -4,3 +4,5 @@ dist/
 .DS_Store
 .claude/tmp/
 .vite/
+cli-paths.json
+run-host.sh
