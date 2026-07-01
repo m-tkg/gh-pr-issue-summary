@@ -9,6 +9,7 @@ import { ChromeLlmClient, type LlmClient } from '../summarize/llmClient'
 import {
   NativeCliLlmClient,
   CLI_LABELS,
+  MODEL_PRESETS,
   type CliKind,
 } from '../summarize/nativeCliClient'
 import {
@@ -33,6 +34,8 @@ import {
   setBackend,
   getCli,
   setCli,
+  getModel,
+  setModel,
   getCachedSummary,
   setCachedSummary,
   type Backend,
@@ -53,10 +56,14 @@ const noteCache: NoteCache = { get: getCachedNote, set: setCachedNote }
 let lang = 'ja'
 let backend: Backend = 'chrome'
 let cli: CliKind = 'claude-code'
+let model = '' // 現在の CLI の選択モデル（空文字 = 既定）
 let llm: LlmClient = new ChromeLlmClient()
 
 function rebuildLlm() {
-  llm = backend === 'cli' ? new NativeCliLlmClient(cli) : new ChromeLlmClient()
+  llm =
+    backend === 'cli'
+      ? new NativeCliLlmClient(cli, model)
+      : new ChromeLlmClient()
 }
 
 let pageData: PageData | null = null
@@ -178,9 +185,27 @@ function buildSettings(): HTMLElement {
         'CLI: ',
         CLI_LABELS.map((c) => ({ value: c.value, label: c.label })),
         cli,
-        (v) => {
+        async (v) => {
           cli = v as CliKind
-          void setCli(cli)
+          await setCli(cli)
+          // 選択 CLI に紐づくモデルを読み直す。
+          model = await getModel(cli)
+          rebuildLlm()
+          renderShell() // モデル選択肢を CLI に合わせて更新
+          renderSegmentList()
+          void checkModel()
+        },
+      ),
+    )
+    wrap.append(
+      buildSelect(
+        'model',
+        'モデル: ',
+        MODEL_PRESETS[cli],
+        model,
+        (v) => {
+          model = v
+          void setModel(cli, model)
           rebuildLlm()
           void checkModel()
         },
@@ -344,7 +369,9 @@ async function onSummarize() {
     let summary
     if (backend === 'cli') {
       // 大コンテキストの CLI は 1 回で要約。
-      setStatus(`ローカル CLI (${cli}) で要約中…（全 ${total} 件、しばらくお待ちください）`)
+      setStatus(
+        `ローカル CLI (${cli}${model ? ` / ${model}` : ''}) で要約中…（全 ${total} 件、しばらくお待ちください）`,
+      )
       ;({ summary } = await summarizeSingleShot(llm, pageData, targetComments, {
         lang,
         onProgress: () => {},
@@ -400,6 +427,7 @@ async function init() {
   lang = await getLanguage()
   backend = await getBackend()
   cli = await getCli()
+  model = await getModel(cli)
   rebuildLlm()
   renderShell()
   await loadPage()

@@ -55,6 +55,8 @@ Native Messaging 経由で「ネイティブホスト（ローカルの中継プ
 > 場合は鍵を再生成し、`key` と install.sh の `DEFAULT_EXT_ID` を更新してください。
 
 補足:
+- CLI ごとに**モデルを選択**できます（設定の「モデル」。空＝各 CLI の既定）。
+  内部では claude=`--model`、codex=`-m`、gemini=`-m` を付与します。
 - Codex は `--sandbox read-only` で実行します。
 - Gemini CLI は個人向けの一部プランで `IneligibleTierError` となり使えない場合があります（CLI 側の認証・プランの問題）。
 - CLI はプロセス起動があるぶん初回応答に時間がかかります。

@@ -63,7 +63,19 @@ describe('NativeCliLlmClient', () => {
     const session = await c.createSession({})
     const out = await session.prompt('これを要約')
     expect(out).toBe('要約結果')
-    expect(seen[0]).toEqual({ cli: 'gemini', prompt: 'これを要約' })
+    expect(seen[0]).toEqual({ cli: 'gemini', prompt: 'これを要約', model: '' })
+  })
+
+  it('prompt: 選択モデルをホストへ渡す', async () => {
+    const seen: unknown[] = []
+    mockChrome((msg) => {
+      seen.push(msg)
+      return { ok: true, text: 'x' }
+    })
+    const c = new NativeCliLlmClient('claude-code', 'haiku')
+    const session = await c.createSession({})
+    await session.prompt('p')
+    expect(seen[0]).toEqual({ cli: 'claude-code', prompt: 'p', model: 'haiku' })
   })
 
   it('prompt: ホストが ok:false ならエラー', async () => {

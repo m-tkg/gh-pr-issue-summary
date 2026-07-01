@@ -30,6 +30,22 @@ export async function setCli(cli: CliKind): Promise<void> {
   await chrome.storage.local.set({ [CLI_KEY]: cli })
 }
 
+// CLI ごとのモデル（空文字 = 既定）。
+const MODELS_KEY = 'cliModels'
+
+export async function getModel(cli: CliKind): Promise<string> {
+  const v = await chrome.storage.local.get(MODELS_KEY)
+  const map = (v[MODELS_KEY] as Record<string, string>) ?? {}
+  return typeof map[cli] === 'string' ? map[cli] : ''
+}
+
+export async function setModel(cli: CliKind, model: string): Promise<void> {
+  const v = await chrome.storage.local.get(MODELS_KEY)
+  const map = (v[MODELS_KEY] as Record<string, string>) ?? {}
+  map[cli] = model
+  await chrome.storage.local.set({ [MODELS_KEY]: map })
+}
+
 export const SUPPORTED_LANGUAGES: { code: string; label: string }[] = [
   { code: 'ja', label: '日本語' },
   { code: 'en', label: 'English' },

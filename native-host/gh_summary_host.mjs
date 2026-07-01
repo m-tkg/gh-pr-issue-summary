@@ -41,27 +41,43 @@ export function parseCodexOutput(raw) {
   return text.trim()
 }
 
-/** CLI ごとの起動仕様。prompt の渡し方（stdin/arg）と出力の解釈が異なる。 */
-export function cliSpec(cliKey, paths = {}) {
+/**
+ * CLI ごとの起動仕様。prompt の渡し方（stdin/arg）と出力の解釈が異なる。
+ * model が指定された場合は各 CLI のモデル指定フラグを付与する。
+ */
+export function cliSpec(cliKey, paths = {}, model = '') {
+  const m = (model || '').trim()
   switch (cliKey) {
     case 'claude-code':
       return {
         bin: paths.claude || 'claude',
-        args: () => ['-p', '--output-format', 'text'],
+        args: () => [
+          '-p',
+          '--output-format',
+          'text',
+          ...(m ? ['--model', m] : []),
+        ],
         useStdin: true,
         parse: (raw) => raw.trim(),
       }
     case 'codex':
       return {
         bin: paths.codex || 'codex',
-        args: () => ['exec', '--json', '--sandbox', 'read-only', '-'],
+        args: () => [
+          'exec',
+          '--json',
+          '--sandbox',
+          'read-only',
+          ...(m ? ['-m', m] : []),
+          '-',
+        ],
         useStdin: true,
         parse: parseCodexOutput,
       }
     case 'gemini':
       return {
         bin: paths.gemini || 'gemini',
-        args: (prompt) => ['-p', prompt, '-o', 'text'],
+        args: (prompt) => ['-p', prompt, '-o', 'text', ...(m ? ['-m', m] : [])],
         useStdin: false,
         parse: (raw) => raw.trim(),
       }
@@ -82,9 +98,9 @@ function augmentedPath() {
   return [process.env.PATH || '', ...extra].filter(Boolean).join(':')
 }
 
-function runCli(cliKey, prompt, paths) {
+function runCli(cliKey, prompt, paths, model) {
   return new Promise((resolve) => {
-    const spec = cliSpec(cliKey, paths)
+    const spec = cliSpec(cliKey, paths, model)
     if (!spec) return resolve({ ok: false, error: `unknown cli: ${cliKey}` })
 
     let child
@@ -184,7 +200,12 @@ async function main() {
       process.exit(0)
     }
     const paths = loadCliPaths()
-    const res = await runCli(msg.cli, String(msg.prompt ?? ''), paths)
+    const res = await runCli(
+      msg.cli,
+      String(msg.prompt ?? ''),
+      paths,
+      String(msg.model ?? ''),
+    )
     writeMessage(res)
   } catch (e) {
     writeMessage({ ok: false, error: e instanceof Error ? e.message : String(e) })

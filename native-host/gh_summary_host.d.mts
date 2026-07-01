@@ -3,6 +3,7 @@ export function parseCodexOutput(raw: string): string
 export function cliSpec(
   cliKey: string,
   paths?: Record<string, string>,
+  model?: string,
 ):
   | {
       bin: string
