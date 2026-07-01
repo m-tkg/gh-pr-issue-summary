@@ -17,6 +17,7 @@ import {
   reducePrompt,
   mergeReducePrompt,
   formatNotesForReduce,
+  singleShotPrompt,
 } from './prompts'
 import { estimateTokens } from './tokens'
 
@@ -133,7 +134,7 @@ export async function mapComments(
 
 function refsToComments(
   refs: unknown,
-  byOrdinal: Map<number, CommentNote>,
+  byOrdinal: Map<number, ClusterComment>,
 ): ClusterComment[] {
   if (!Array.isArray(refs)) return []
   const seen = new Set<string>()
@@ -155,7 +156,7 @@ function refsToComments(
 
 function parseClusters(
   obj: Record<string, unknown>,
-  byOrdinal: Map<number, CommentNote>,
+  byOrdinal: Map<number, ClusterComment>,
 ): Cluster[] {
   const raw = Array.isArray(obj.clusters) ? obj.clusters : []
   const clusters: Cluster[] = raw.map((c: Record<string, unknown>) => ({
@@ -218,6 +219,38 @@ export function buildParentAndLinks(page: PageData, lang: string): string {
   return lines.join('\n')
 }
 
+/** モデル出力(JSON)と序数マップから FinalSummary を組み立てる（共通）。 */
+export function assembleFinalSummary(
+  obj: Record<string, unknown>,
+  page: PageData,
+  lang: string,
+  byOrdinal: Map<number, ClusterComment>,
+): FinalSummary {
+  return {
+    overview: String(obj.overview ?? ''),
+    parentAndLinks: buildParentAndLinks(page, lang),
+    overallDiscussion: String(obj.overallDiscussion ?? ''),
+    currentProgress: String(obj.currentProgress ?? ''),
+    clusters: parseClusters(obj, byOrdinal),
+  }
+}
+
+function ordinalMapFromNotes(
+  notes: CommentNote[],
+): Map<number, ClusterComment> {
+  return new Map(
+    notes.map((n) => [
+      n.ordinal,
+      {
+        url: n.url,
+        ordinal: n.ordinal,
+        author: n.author,
+        timestampISO: n.timestampISO,
+      },
+    ]),
+  )
+}
+
 /** メモ列を最終要約へ集約する。多すぎる場合は階層 reduce。 */
 export async function reduceNotes(
   llm: LlmClient,
@@ -225,7 +258,7 @@ export async function reduceNotes(
   page: PageData,
   opts: SummarizeOptions,
 ): Promise<FinalSummary> {
-  const byOrdinal = new Map(notes.map((n) => [n.ordinal, n]))
+  const byOrdinal = ordinalMapFromNotes(notes)
   const single = formatNotesForReduce(notes)
 
   let obj: Record<string, unknown>
@@ -255,13 +288,7 @@ export async function reduceNotes(
     opts.onProgress?.(batches.length + 1, batches.length + 1, 'reduce')
   }
 
-  return {
-    overview: String(obj.overview ?? ''),
-    parentAndLinks: buildParentAndLinks(page, opts.lang),
-    overallDiscussion: String(obj.overallDiscussion ?? ''),
-    currentProgress: String(obj.currentProgress ?? ''),
-    clusters: parseClusters(obj, byOrdinal),
-  }
+  return assembleFinalSummary(obj, page, opts.lang, byOrdinal)
 }
 
 function batchByTokens(
@@ -308,4 +335,44 @@ export async function summarize(
   const notes = await mapComments(llm, comments, startOrdinal, opts)
   const summary = await reduceNotes(llm, notes, page, opts)
   return { notes, summary }
+}
+
+/**
+ * 大コンテキストのバックエンド（CLI 等）向け: 全コメントを 1 回の呼び出しで
+ * 構造化要約する。プロセス起動回数を最小化でき高速。
+ */
+export async function summarizeSingleShot(
+  llm: LlmClient,
+  page: PageData,
+  comments: CommentData[],
+  opts: SummarizeOptions,
+): Promise<{ summary: FinalSummary }> {
+  const session = await llm.createSession({
+    systemPrompt: systemPrompt(opts.lang),
+    outputLanguage: opts.lang,
+    signal: opts.signal,
+  })
+  try {
+    opts.onProgress?.(0, 1, 'reduce')
+    const raw = await session.prompt(
+      singleShotPrompt(page, comments, opts.lang),
+      { responseConstraint: FINAL_SCHEMA, signal: opts.signal },
+    )
+    const obj = parseJson(raw) as Record<string, unknown>
+    const byOrdinal = new Map<number, ClusterComment>(
+      comments.map((c, i) => [
+        i + 1,
+        {
+          url: c.permalink,
+          ordinal: i + 1,
+          author: c.author,
+          timestampISO: c.timestampISO,
+        },
+      ]),
+    )
+    opts.onProgress?.(1, 1, 'reduce')
+    return { summary: assembleFinalSummary(obj, page, opts.lang, byOrdinal) }
+  } finally {
+    session.destroy()
+  }
 }

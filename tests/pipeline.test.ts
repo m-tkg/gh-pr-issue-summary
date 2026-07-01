@@ -4,6 +4,7 @@ import {
   mapComment,
   reduceNotes,
   summarize,
+  summarizeSingleShot,
   buildParentAndLinks,
 } from '../src/summarize/pipeline'
 import { truncateToTokens } from '../src/summarize/tokens'
@@ -261,5 +262,32 @@ describe('summarize (map→reduce 結合)', () => {
     expect(summary.clusters[0].comments).toHaveLength(2)
     // map は 1 コメント 1 セッション
     expect(llm.createdSessions).toBe(3) // map×2 + reduce×1
+  })
+})
+
+describe('summarizeSingleShot (大コンテキスト/CLI 向け 1 回要約)', () => {
+  it('1 回の呼び出しで最終要約を返し、commentRefs を permalink に解決する', async () => {
+    const llm = new MockLlmClient(() =>
+      JSON.stringify({
+        overview: '概要',
+        overallDiscussion: '議論',
+        currentProgress: '進捗',
+        clusters: [
+          { title: 'T', summary: 'S', importance: 'high', commentRefs: [1, 2] },
+        ],
+      }),
+    )
+    const comments = [comment(11, 'a'), comment(22, 'b')]
+    const { summary } = await summarizeSingleShot(llm, page, comments, {
+      lang: 'ja',
+    })
+    // LLM 呼び出しは 1 回（1 セッション）
+    expect(llm.createdSessions).toBe(1)
+    expect(llm.prompts).toHaveLength(1)
+    expect(summary.overview).toBe('概要')
+    expect(summary.clusters[0].comments.map((c) => c.url)).toEqual([
+      '/r/r/issues/1#issuecomment-11',
+      '/r/r/issues/1#issuecomment-22',
+    ])
   })
 })

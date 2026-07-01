@@ -5,13 +5,22 @@ import type {
   ExtractResponse,
   ThemeResponse,
 } from '../shared/messages'
-import { ChromeLlmClient } from '../summarize/llmClient'
+import { ChromeLlmClient, type LlmClient } from '../summarize/llmClient'
+import {
+  NativeCliLlmClient,
+  CLI_LABELS,
+  type CliKind,
+} from '../summarize/nativeCliClient'
 import {
   planSegments,
   DEFAULT_SEGMENT_BUDGET,
   type Segment,
 } from '../summarize/segment'
-import { summarize, type NoteCache } from '../summarize/pipeline'
+import {
+  summarize,
+  summarizeSingleShot,
+  type NoteCache,
+} from '../summarize/pipeline'
 import {
   getLanguage,
   setLanguage,
@@ -20,6 +29,11 @@ import {
   setCachedNote,
   getCachedPalette,
   setCachedPalette,
+  getBackend,
+  setBackend,
+  getCli,
+  setCli,
+  type Backend,
 } from './storage'
 import {
   el,
@@ -31,10 +45,17 @@ import {
 } from './render'
 
 const app = document.getElementById('app')!
-const llm = new ChromeLlmClient()
 const noteCache: NoteCache = { get: getCachedNote, set: setCachedNote }
 
 let lang = 'ja'
+let backend: Backend = 'chrome'
+let cli: CliKind = 'claude-code'
+let llm: LlmClient = new ChromeLlmClient()
+
+function rebuildLlm() {
+  llm = backend === 'cli' ? new NativeCliLlmClient(cli) : new ChromeLlmClient()
+}
+
 let pageData: PageData | null = null
 let segments: Segment[] = []
 let activeTabId: number | null = null
@@ -92,22 +113,77 @@ function scrollToComment(commentId: string) {
   )
 }
 
-// --- 言語セレクタ ---
-function buildLanguageSelector(): HTMLElement {
-  const wrap = el('div', { class: 'lang-selector' }, [
-    el('label', { for: 'lang' }, ['要約言語: ']),
+// --- 設定（言語 / バックエンド / CLI） ---
+function buildSelect(
+  id: string,
+  labelText: string,
+  options: { value: string; label: string }[],
+  current: string,
+  onChange: (value: string) => void,
+): HTMLElement {
+  const wrap = el('div', { class: 'setting-row' }, [
+    el('label', { for: id }, [labelText]),
   ])
-  const select = el('select', { id: 'lang' }) as HTMLSelectElement
-  for (const { code, label } of SUPPORTED_LANGUAGES) {
-    const opt = el('option', { value: code }, [label]) as HTMLOptionElement
-    if (code === lang) opt.selected = true
+  const select = el('select', { id }) as HTMLSelectElement
+  for (const { value, label } of options) {
+    const opt = el('option', { value }, [label]) as HTMLOptionElement
+    if (value === current) opt.selected = true
     select.append(opt)
   }
-  select.addEventListener('change', async () => {
-    lang = select.value
-    await setLanguage(lang)
-  })
+  select.addEventListener('change', () => onChange(select.value))
   wrap.append(select)
+  return wrap
+}
+
+function buildSettings(): HTMLElement {
+  const wrap = el('div', { class: 'settings' })
+  wrap.append(
+    buildSelect(
+      'lang',
+      '要約言語: ',
+      SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: l.label })),
+      lang,
+      (v) => {
+        lang = v
+        void setLanguage(lang)
+      },
+    ),
+  )
+  wrap.append(
+    buildSelect(
+      'backend',
+      '推論: ',
+      [
+        { value: 'chrome', label: 'Chrome 組み込み (Gemini Nano)' },
+        { value: 'cli', label: 'ローカル CLI' },
+      ],
+      backend,
+      (v) => {
+        backend = v === 'cli' ? 'cli' : 'chrome'
+        void setBackend(backend)
+        rebuildLlm()
+        renderShell()
+        renderSegmentList()
+        void checkModel()
+      },
+    ),
+  )
+  if (backend === 'cli') {
+    wrap.append(
+      buildSelect(
+        'cli',
+        'CLI: ',
+        CLI_LABELS.map((c) => ({ value: c.value, label: c.label })),
+        cli,
+        (v) => {
+          cli = v as CliKind
+          void setCli(cli)
+          rebuildLlm()
+          void checkModel()
+        },
+      ),
+    )
+  }
   return wrap
 }
 
@@ -117,7 +193,7 @@ const resultsRoot = el('div', { id: 'results' })
 function renderShell() {
   clear(app)
   if (pageData) app.append(renderHeader(pageData))
-  app.append(buildLanguageSelector())
+  app.append(buildSettings())
   app.append(resultsRoot)
 }
 
@@ -200,23 +276,27 @@ async function loadPage() {
 async function checkModel() {
   const status = await llm.availability({ outputLanguage: lang })
   if (status === 'unavailable') {
-    setStatus(
-      'この Chrome では組み込み AI (Gemini Nano) を利用できません。Chrome 138+ と、chrome://flags の Prompt API 有効化が必要です。',
-      'error',
-    )
+    if (backend === 'cli') {
+      setStatus(
+        `ローカル CLI に接続できません。ネイティブホストが未インストールの可能性があります（native-host/install.sh を実行）。選択中の CLI: ${cli}`,
+        'error',
+      )
+    } else {
+      setStatus(
+        'この Chrome では組み込み AI (Gemini Nano) を利用できません。Chrome 138+ と、chrome://flags の Prompt API 有効化が必要です。',
+        'error',
+      )
+    }
   } else if (status === 'downloadable' || status === 'downloading') {
     setStatus(
       'モデルの準備が必要です。要約を開始すると初回ダウンロードが行われます（時間がかかる場合があります）。',
     )
   } else {
-    setStatus(`コメント ${pageData?.comments.length ?? 0} 件。範囲を選んで要約を開始してください。`)
+    setStatus(`コメント ${pageData?.comments.length ?? 0} 件。要約を開始してください。`)
   }
 }
 
-/**
- * 要約を実行する。target='all' なら全体、数値ならそのセグメントのみ。
- */
-/** スレッド全体を要約する。 */
+/** スレッド全体を要約する。バックエンドにより方式を切り替える。 */
 async function onSummarize() {
   if (running || !pageData || activeTabId == null) return
   running = true
@@ -231,17 +311,27 @@ async function onSummarize() {
     const total = targetComments.length
     setStatus(`要約を準備中…（全 ${total} 件）`)
 
-    const { summary } = await summarize(llm, pageData, targetComments, 1, {
-      lang,
-      noteCache,
-      onProgress: (done, t, phase) => {
-        if (phase === 'map') {
-          setStatus(`コメント解析中… ${done}/${t}`)
-        } else {
-          setStatus(`集約中… (${done}/${t})`)
-        }
-      },
-    })
+    let summary
+    if (backend === 'cli') {
+      // 大コンテキストの CLI は 1 回で要約。
+      setStatus(`ローカル CLI (${cli}) で要約中…（全 ${total} 件、しばらくお待ちください）`)
+      ;({ summary } = await summarizeSingleShot(llm, pageData, targetComments, {
+        lang,
+        onProgress: () => {},
+      }))
+    } else {
+      ;({ summary } = await summarize(llm, pageData, targetComments, 1, {
+        lang,
+        noteCache,
+        onProgress: (done, t, phase) => {
+          if (phase === 'map') {
+            setStatus(`コメント解析中… ${done}/${t}`)
+          } else {
+            setStatus(`集約中… (${done}/${t})`)
+          }
+        },
+      }))
+    }
 
     for (const seg of segments) {
       segmentStates.set(seg.index, { status: 'done' })
@@ -276,6 +366,9 @@ async function init() {
   const cached = await getCachedPalette()
   if (cached) applyPalette(cached)
   lang = await getLanguage()
+  backend = await getBackend()
+  cli = await getCli()
+  rebuildLlm()
   renderShell()
   await loadPage()
 }

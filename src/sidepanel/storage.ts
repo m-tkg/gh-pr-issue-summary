@@ -2,9 +2,33 @@
 
 import type { CommentNote } from '../summarize/types'
 import type { Palette } from '../content/theme'
+import type { CliKind } from '../summarize/nativeCliClient'
 
 const LANG_KEY = 'outputLanguage'
 const PALETTE_KEY = 'lastPalette'
+const BACKEND_KEY = 'backend'
+const CLI_KEY = 'cli'
+
+export type Backend = 'chrome' | 'cli'
+
+export async function getBackend(): Promise<Backend> {
+  const v = await chrome.storage.local.get(BACKEND_KEY)
+  return v[BACKEND_KEY] === 'cli' ? 'cli' : 'chrome'
+}
+
+export async function setBackend(backend: Backend): Promise<void> {
+  await chrome.storage.local.set({ [BACKEND_KEY]: backend })
+}
+
+export async function getCli(): Promise<CliKind> {
+  const v = await chrome.storage.local.get(CLI_KEY)
+  const val = v[CLI_KEY]
+  return val === 'codex' || val === 'gemini' ? val : 'claude-code'
+}
+
+export async function setCli(cli: CliKind): Promise<void> {
+  await chrome.storage.local.set({ [CLI_KEY]: cli })
+}
 
 export const SUPPORTED_LANGUAGES: { code: string; label: string }[] = [
   { code: 'ja', label: '日本語' },

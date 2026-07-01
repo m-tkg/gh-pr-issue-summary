@@ -79,6 +79,48 @@ export function reducePrompt(
   ].join('\n')
 }
 
+/** 単発要約（大コンテキストの CLI/モデル向け）: 全コメントを 1 回で構造化要約。 */
+export const SINGLESHOT_PER_COMMENT_TOKEN_BUDGET = 1500
+
+export function singleShotPrompt(
+  page: PageData,
+  comments: CommentData[],
+  lang: string,
+): string {
+  const list = comments
+    .map((c, i) => {
+      const meta = [c.author, c.timestampISO].filter(Boolean).join(', ')
+      const body = truncateToTokens(
+        c.text,
+        SINGLESHOT_PER_COMMENT_TOKEN_BUDGET,
+      )
+      return `[${i + 1}] (${meta})\n${body}`
+    })
+    .join('\n\n')
+
+  return [
+    `GitHub の ${page.type === 'pull' ? 'PR' : 'issue'} 「${page.title}」の議論を要約します。`,
+    `状態: ${page.state}`,
+    '',
+    `# ${page.type === 'pull' ? 'PR' : 'issue'} 本文`,
+    truncateToTokens(page.body, 1500),
+    '',
+    `# コメント一覧（[番号] は元コメントの参照）`,
+    list || '（コメントなし）',
+    '',
+    `# 指示`,
+    `${langName(lang)} で、次の項目を持つ JSON オブジェクトを**1つだけ**出力してください。`,
+    `前後に説明文やコードフェンスを付けず、JSON のみを出力すること。`,
+    `- overview: どのような issue/PR か（本文の主旨）`,
+    `- overallDiscussion: 全体を通した議論の流れ（重要点は厚く、些末は薄く）`,
+    `- currentProgress: 現状の進捗・結論の状態`,
+    `- clusters: 議論のかたまりの配列。各要素は`,
+    `    title(string) / summary(string) / importance("high"|"medium"|"low") /`,
+    `    commentRefs(その論点に関係するコメントの [番号] の整数配列)`,
+    `複数の論点があればまとまりごとに cluster を分けること。`,
+  ].join('\n')
+}
+
 /** 部分要約（クラスタ候補のテキスト）をさらに統合する階層 reduce 用プロンプト。 */
 export function mergeReducePrompt(
   partialSummaries: string[],

@@ -77,12 +77,25 @@ h2 {
   background: var(--state-draft);
 }
 
-/* 言語セレクタ */
-.lang-selector {
+/* 設定 */
+.settings {
   margin: 10px 0;
   font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.lang-selector select {
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.setting-row label {
+  min-width: 72px;
+  color: var(--fg-muted);
+}
+.setting-row select {
+  flex: 1;
   background: var(--bg-muted);
   color: var(--fg);
   border: 1px solid var(--border);
