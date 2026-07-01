@@ -26,19 +26,20 @@ CLAUDE="$(resolve claude)"
 # claude はシェル関数のことがあるため既知の実体パスを優先
 if [ -x "$HOME/.local/bin/claude" ]; then CLAUDE="$HOME/.local/bin/claude"; fi
 CODEX="$(resolve codex)"
-GEMINI="$(resolve gemini)"
+ANTIGRAVITY="$(resolve agy)"
+if [ -x "$HOME/.local/bin/agy" ]; then ANTIGRAVITY="$HOME/.local/bin/agy"; fi
 
 cat > "$DIR/cli-paths.json" <<EOF
 {
   "claude": "${CLAUDE}",
   "codex": "${CODEX}",
-  "gemini": "${GEMINI}"
+  "antigravity": "${ANTIGRAVITY}"
 }
 EOF
 echo "解決した CLI パス:"
-echo "  claude: ${CLAUDE:-(未検出)}"
-echo "  codex : ${CODEX:-(未検出)}"
-echo "  gemini: ${GEMINI:-(未検出)}"
+echo "  claude     : ${CLAUDE:-(未検出)}"
+echo "  codex      : ${CODEX:-(未検出)}"
+echo "  antigravity: ${ANTIGRAVITY:-(未検出)}"
 
 # --- node ラッパ（Chrome の最小 PATH でも動くよう絶対パスで node を呼ぶ） ---
 cat > "$WRAPPER" <<EOF

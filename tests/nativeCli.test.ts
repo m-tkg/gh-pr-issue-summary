@@ -59,11 +59,15 @@ describe('NativeCliLlmClient', () => {
       seen.push(msg)
       return { ok: true, text: '要約結果' }
     })
-    const c = new NativeCliLlmClient('gemini')
+    const c = new NativeCliLlmClient('antigravity')
     const session = await c.createSession({})
     const out = await session.prompt('これを要約')
     expect(out).toBe('要約結果')
-    expect(seen[0]).toEqual({ cli: 'gemini', prompt: 'これを要約', model: '' })
+    expect(seen[0]).toEqual({
+      cli: 'antigravity',
+      prompt: 'これを要約',
+      model: '',
+    })
   })
 
   it('prompt: 選択モデルをホストへ渡す', async () => {

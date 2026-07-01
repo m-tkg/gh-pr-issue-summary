@@ -1,4 +1,4 @@
-// ローカル CLI(claude-code / codex / gemini)を Native Messaging 経由で使う
+// ローカル CLI(claude-code / codex / antigravity)を Native Messaging 経由で使う
 // LlmClient 実装。拡張 → ネイティブホスト → CLI と中継する。
 
 import type {
@@ -11,12 +11,12 @@ import type {
 
 export const NATIVE_HOST_NAME = 'com.m_tkg.gh_summary_host'
 
-export type CliKind = 'claude-code' | 'codex' | 'gemini'
+export type CliKind = 'claude-code' | 'codex' | 'antigravity'
 
 export const CLI_LABELS: { value: CliKind; label: string }[] = [
   { value: 'claude-code', label: 'Claude Code' },
   { value: 'codex', label: 'Codex' },
-  { value: 'gemini', label: 'Gemini' },
+  { value: 'antigravity', label: 'Antigravity' },
 ]
 
 /**
@@ -39,10 +39,16 @@ export const MODEL_PRESETS: Record<
     { value: 'gpt-5', label: 'gpt-5' },
     { value: 'o3', label: 'o3' },
   ],
-  gemini: [
+  // agy の `agy models` の表示名がそのまま --model の値になる。
+  antigravity: [
     { value: '', label: 'デフォルト' },
-    { value: 'gemini-2.5-pro', label: '2.5 Pro' },
-    { value: 'gemini-2.5-flash', label: '2.5 Flash' },
+    { value: 'Gemini 3.1 Pro (High)', label: 'Gemini 3.1 Pro (High)' },
+    { value: 'Gemini 3.1 Pro (Low)', label: 'Gemini 3.1 Pro (Low)' },
+    { value: 'Gemini 3.5 Flash (High)', label: 'Gemini 3.5 Flash (High)' },
+    { value: 'Gemini 3.5 Flash (Medium)', label: 'Gemini 3.5 Flash (Medium)' },
+    { value: 'Claude Opus 4.6 (Thinking)', label: 'Claude Opus 4.6 (Thinking)' },
+    { value: 'Claude Sonnet 4.6 (Thinking)', label: 'Claude Sonnet 4.6 (Thinking)' },
+    { value: 'GPT-OSS 120B (Medium)', label: 'GPT-OSS 120B (Medium)' },
   ],
 }
 

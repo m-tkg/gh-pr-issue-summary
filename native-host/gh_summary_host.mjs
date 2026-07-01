@@ -83,20 +83,13 @@ export function cliSpec(cliKey, paths = {}, model = '') {
         useStdin: true,
         parse: parseCodexOutput,
       }
-    case 'gemini':
-      // plan モード = read-only（ツールで状態変更しない）。
+    case 'antigravity':
+      // agy: 非対話 print モード + サンドボックス（端末制限）。
+      // --dangerously-skip-permissions は付けない（未承認ツールは実行されない）。
       return {
-        bin: paths.gemini || 'gemini',
-        args: (prompt) => [
-          '-p',
-          prompt,
-          '-o',
-          'text',
-          '--approval-mode',
-          'plan',
-          ...(m ? ['-m', m] : []),
-        ],
-        useStdin: false,
+        bin: paths.antigravity || 'agy',
+        args: () => ['-p', '--sandbox', ...(m ? ['--model', m] : [])],
+        useStdin: true,
         parse: (raw) => raw.trim(),
       }
     default:

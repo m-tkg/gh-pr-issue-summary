@@ -23,7 +23,7 @@ export async function setBackend(backend: Backend): Promise<void> {
 export async function getCli(): Promise<CliKind> {
   const v = await chrome.storage.local.get(CLI_KEY)
   const val = v[CLI_KEY]
-  return val === 'codex' || val === 'gemini' ? val : 'claude-code'
+  return val === 'codex' || val === 'antigravity' ? val : 'claude-code'
 }
 
 export async function setCli(cli: CliKind): Promise<void> {
