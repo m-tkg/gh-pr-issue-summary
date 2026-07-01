@@ -22,8 +22,20 @@ export default defineManifest({
     service_worker: 'src/background/service-worker.ts',
     type: 'module',
   },
+  icons: {
+    16: 'icons/icon16.png',
+    32: 'icons/icon32.png',
+    48: 'icons/icon48.png',
+    128: 'icons/icon128.png',
+  },
   action: {
     default_title: 'コメント要約を開く',
+    default_icon: {
+      16: 'icons/icon16.png',
+      32: 'icons/icon32.png',
+      48: 'icons/icon48.png',
+      128: 'icons/icon128.png',
+    },
   },
   side_panel: {
     default_path: 'src/sidepanel/index.html',
