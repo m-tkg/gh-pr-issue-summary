@@ -74,32 +74,18 @@ describe('renderSegments', () => {
     expect(onAll).toHaveBeenCalled()
   })
 
-  it('全範囲が要約済みなら「全体を要約」は disable', () => {
-    const states = new Map<number, SegmentViewState>([
-      [0, { status: 'done' }],
-      [1, { status: 'done' }],
-    ])
-    const node = renderSegments(segs, states, { onSummarizeAll: () => {} })
-    expect(
-      (node.querySelector('.summarize-all-btn') as HTMLButtonElement).disabled,
-    ).toBe(true)
-  })
-
-  it('要約中は「全体を要約」を disable', () => {
-    const states = new Map<number, SegmentViewState>([
-      [0, { status: 'running' }],
-    ])
-    const node = renderSegments(segs, states, { onSummarizeAll: () => {} })
-    expect(
-      (node.querySelector('.summarize-all-btn') as HTMLButtonElement).disabled,
-    ).toBe(true)
-  })
-
-  it('未実行なら「全体を要約」は有効', () => {
-    const node = renderSegments(segs, new Map(), { onSummarizeAll: () => {} })
-    expect(
-      (node.querySelector('.summarize-all-btn') as HTMLButtonElement).disabled,
-    ).toBe(false)
+  it('「全体を要約」は常に disable しない（要約済み/要約中でも押せる）', () => {
+    const cases: SegmentViewState['status'][] = ['done', 'running', 'pending']
+    for (const status of cases) {
+      const states = new Map<number, SegmentViewState>([
+        [0, { status }],
+        [1, { status }],
+      ])
+      const node = renderSegments(segs, states, { onSummarizeAll: () => {} })
+      const btn = node.querySelector('.summarize-all-btn') as HTMLButtonElement
+      expect(btn.disabled).toBe(false)
+      expect(btn.textContent).toBe('全体を要約')
+    }
   })
 })
 

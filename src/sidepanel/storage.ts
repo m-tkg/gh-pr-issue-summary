@@ -1,6 +1,6 @@
 // chrome.storage.local による設定・キャッシュの薄いラッパ。
 
-import type { CommentNote } from '../summarize/types'
+import type { CommentNote, FinalSummary } from '../summarize/types'
 import type { Palette } from '../content/theme'
 import type { CliKind } from '../summarize/nativeCliClient'
 
@@ -78,4 +78,35 @@ export async function setCachedNote(
   lang: string,
 ): Promise<void> {
   await chrome.storage.local.set({ [noteKey(note.id, lang)]: note })
+}
+
+// --- 最終要約のキャッシュ（ページ単位。再訪時に前回結果を表示） ---
+
+export interface CachedSummary {
+  summary: FinalSummary
+  /** 要約時点のコメント件数（古さの判定に使う）。 */
+  commentCount: number
+  /** 保存時刻(epoch ms)。 */
+  savedAt: number
+}
+
+function summaryKey(pageKey: string, lang: string): string {
+  return `summary:v1:${lang}:${pageKey}`
+}
+
+export async function getCachedSummary(
+  pageKey: string,
+  lang: string,
+): Promise<CachedSummary | null> {
+  const k = summaryKey(pageKey, lang)
+  const v = await chrome.storage.local.get(k)
+  return (v[k] as CachedSummary) ?? null
+}
+
+export async function setCachedSummary(
+  pageKey: string,
+  lang: string,
+  value: CachedSummary,
+): Promise<void> {
+  await chrome.storage.local.set({ [summaryKey(pageKey, lang)]: value })
 }

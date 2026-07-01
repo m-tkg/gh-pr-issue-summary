@@ -33,8 +33,11 @@ import {
   setBackend,
   getCli,
   setCli,
+  getCachedSummary,
+  setCachedSummary,
   type Backend,
 } from './storage'
+import type { FinalSummary } from '../summarize/types'
 import {
   el,
   applyPalette,
@@ -271,6 +274,33 @@ async function loadPage() {
   renderShell()
   renderSegmentList()
   await checkModel()
+  await showCachedSummary()
+}
+
+function pageKey(p: PageData): string {
+  return `${p.repo}/${p.type}/${p.number}`
+}
+
+function renderSummaryInto(summary: FinalSummary) {
+  const old = document.getElementById('summary-root')
+  const node = renderSummary(summary, scrollToComment)
+  node.id = 'summary-root'
+  if (old) old.replaceWith(node)
+  else resultsRoot.append(node)
+}
+
+/** 前回の要約がキャッシュにあれば表示する。 */
+async function showCachedSummary() {
+  if (!pageData) return
+  const cached = await getCachedSummary(pageKey(pageData), lang)
+  if (!cached) return
+  renderSummaryInto(cached.summary)
+  const now = pageData.comments.length
+  const stale =
+    cached.commentCount !== now
+      ? `（前回時点 ${cached.commentCount} 件 → 現在 ${now} 件。最新化するには再度要約）`
+      : ''
+  setStatus(`前回の要約を表示中${stale}`, 'muted')
 }
 
 async function checkModel() {
@@ -339,11 +369,13 @@ async function onSummarize() {
     renderSegmentList()
     setStatus(`要約完了（全 ${total} 件）。`, 'muted')
 
-    const old = document.getElementById('summary-root')
-    const node = renderSummary(summary, scrollToComment)
-    node.id = 'summary-root'
-    if (old) old.replaceWith(node)
-    else resultsRoot.append(node)
+    renderSummaryInto(summary)
+    // ページ単位でキャッシュ（再訪時に前回結果を表示）。
+    await setCachedSummary(pageKey(pageData), lang, {
+      summary,
+      commentCount: total,
+      savedAt: Date.now(),
+    })
   } catch (err) {
     setStatus(
       `要約中にエラーが発生しました: ${err instanceof Error ? err.message : String(err)}`,

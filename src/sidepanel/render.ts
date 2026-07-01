@@ -82,7 +82,7 @@ export interface SegmentHandlers {
  */
 export function renderSegments(
   segments: Segment[],
-  states: Map<number, SegmentViewState>,
+  _states: Map<number, SegmentViewState>,
   handlers: SegmentHandlers,
 ): HTMLElement {
   const wrap = el('div', { class: 'segments' })
@@ -91,16 +91,8 @@ export function renderSegments(
     return wrap
   }
 
-  const allDone = segments.every(
-    (seg) => states.get(seg.index)?.status === 'done',
-  )
-  const running = segments.some(
-    (seg) => states.get(seg.index)?.status === 'running',
-  )
-  const allBtn = el('button', { class: 'summarize-all-btn' }, [
-    allDone ? '全体を要約済み' : running ? '要約中…' : '全体を要約',
-  ]) as HTMLButtonElement
-  allBtn.disabled = allDone || running
+  // 全体を要約ボタンは常に押せる（disable しない。進捗はステータス行に表示）。
+  const allBtn = el('button', { class: 'summarize-all-btn' }, ['全体を要約'])
   allBtn.addEventListener('click', () => handlers.onSummarizeAll())
   wrap.append(allBtn)
 
