@@ -20,6 +20,7 @@ import {
   singleShotPrompt,
 } from './prompts'
 import { estimateTokens } from './tokens'
+import { parseJsonLoose as parseJson } from './parseJson'
 
 /** reduce 入力（メモ列）のトークン上限。超えると階層 reduce に切替。 */
 export const REDUCE_INPUT_TOKEN_BUDGET = 3000
@@ -42,17 +43,6 @@ function coerceImportance(v: unknown): Importance {
   return VALID_IMPORTANCE.includes(v as Importance)
     ? (v as Importance)
     : 'medium'
-}
-
-function parseJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw)
-  } catch {
-    // モデルが前後に文字を付けた場合に最初の { … } を救出する。
-    const m = raw.match(/\{[\s\S]*\}/)
-    if (m) return JSON.parse(m[0])
-    throw new Error(`要約結果の JSON 解析に失敗しました: ${raw.slice(0, 80)}`)
-  }
 }
 
 export interface ProgressCallback {
