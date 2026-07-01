@@ -41,6 +41,7 @@ import {
   type Backend,
 } from './storage'
 import type { FinalSummary } from '../summarize/types'
+import { isIssueOrPrUrl } from '../shared/url'
 import {
   el,
   applyPalette,
@@ -77,10 +78,16 @@ function clear(node: HTMLElement) {
 }
 
 function setStatus(text: string, cls = 'muted') {
-  const s = el('p', { class: cls }, [text])
+  const s = el('p', { class: `status ${cls}` }, [text])
   s.id = 'status'
   const old = document.getElementById('status')
-  if (old) old.replaceWith(s)
+  if (old) {
+    old.replaceWith(s)
+    return
+  }
+  // 「全体を要約」ボタン（segment-list）の直下に表示する。
+  const segList = document.getElementById('segment-list')
+  if (segList) segList.after(s)
   else app.append(s)
 }
 
@@ -165,7 +172,7 @@ function buildSettings(): HTMLElement {
       '推論: ',
       [
         { value: 'chrome', label: 'Chrome 組み込み (Gemini Nano)' },
-        { value: 'cli', label: 'ローカル CLI' },
+        { value: 'cli', label: 'CLI' },
       ],
       backend,
       (v) => {
@@ -254,16 +261,12 @@ async function applyThemeFast(tabId: number) {
   }
 }
 
-function isGitHubUrl(url: string | undefined): boolean {
-  return !!url && /^https:\/\/github\.com\//.test(url)
-}
-
 async function loadPage() {
   setStatus('ページを読み込み中…')
   const tab = await getActiveTab()
   activeTabId = tab?.id ?? null
-  if (!tab?.id || !isGitHubUrl(tab.url)) {
-    // GitHub 以外のタブに移動したら、サイドパネル自体を閉じる。
+  if (!tab?.id || !isIssueOrPrUrl(tab.url)) {
+    // issue/PR 詳細ページ以外（一覧ページや GitHub 以外）ならサイドパネルを閉じる。
     window.close()
     return
   }
@@ -337,7 +340,7 @@ async function checkModel() {
   if (status === 'unavailable') {
     if (backend === 'cli') {
       setStatus(
-        `ローカル CLI に接続できません。ネイティブホストが未インストールの可能性があります（native-host/install.sh を実行）。選択中の CLI: ${cli}`,
+        `CLI に接続できません。ネイティブホストが未インストールの可能性があります（native-host/install.sh を実行）。選択中の CLI: ${cli}`,
         'error',
       )
     } else {
@@ -373,7 +376,7 @@ async function onSummarize() {
     if (backend === 'cli') {
       // 大コンテキストの CLI は 1 回で要約。
       setStatus(
-        `ローカル CLI (${cli}${model ? ` / ${model}` : ''}) で要約中…（しばらくお待ちください）`,
+        `CLI (${cli}${model ? ` / ${model}` : ''}) で要約中…（しばらくお待ちください）`,
       )
       ;({ summary } = await summarizeSingleShot(llm, pageData, targetComments, {
         lang,
@@ -436,24 +439,24 @@ async function init() {
   await loadPage()
 }
 
-/** アクティブタブが GitHub 以外ならサイドパネルを閉じる（要約中でも）。 */
-async function closeIfNotGitHub(tabId: number) {
+/** アクティブタブが issue/PR 詳細以外ならサイドパネルを閉じる（要約中でも）。 */
+async function closeIfNotTarget(tabId: number) {
   try {
     const tab = await chrome.tabs.get(tabId)
-    if (!isGitHubUrl(tab.url)) window.close()
+    if (!isIssueOrPrUrl(tab.url)) window.close()
   } catch {
     /* タブ取得失敗は無視 */
   }
 }
 
-// タブ切替・URL 変更で再読み込み（GitHub 以外へ移動したら閉じる）
+// タブ切替・URL 変更で再読み込み（issue/PR 詳細以外へ移動したら閉じる）
 chrome.tabs.onActivated.addListener(({ tabId }) => {
-  void closeIfNotGitHub(tabId)
+  void closeIfNotTarget(tabId)
   if (!running) void loadPage()
 })
 chrome.tabs.onUpdated.addListener((tabId, info) => {
   if (info.url !== undefined && tabId === activeTabId) {
-    void closeIfNotGitHub(tabId)
+    void closeIfNotTarget(tabId)
   }
   if (info.status === 'complete' && tabId === activeTabId && !running) {
     void loadPage()

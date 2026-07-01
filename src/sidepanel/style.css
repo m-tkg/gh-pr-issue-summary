@@ -38,6 +38,10 @@ h2 {
   color: var(--fg-muted);
 }
 
+.status {
+  margin: 8px 0;
+}
+
 .error {
   color: var(--state-closed);
 }

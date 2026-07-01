@@ -1,6 +1,9 @@
 // Service worker:
 // - ツールバーアイコンのクリックでサイドパネルを開く
-// - GitHub 以外のタブではサイドパネルを無効化（=開いていれば閉じる）
+// - issue/PR の詳細ページ以外ではサイドパネルを無効化（=開いていれば閉じる）
+//   （一覧ページ /issues, /pulls や GitHub 以外は対象外）
+
+import { isIssueOrPrUrl } from '../shared/url'
 
 const SIDE_PANEL_PATH = 'src/sidepanel/index.html'
 
@@ -8,19 +11,10 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((err) => console.error('[gh-summary] setPanelBehavior failed', err))
 
-function isGitHub(url: string | undefined): boolean {
-  if (!url) return false
-  try {
-    return new URL(url).hostname === 'github.com'
-  } catch {
-    return false
-  }
-}
-
 /** タブの URL に応じてサイドパネルの有効/無効を切り替える。 */
 async function updateSidePanelForTab(tabId: number, url: string | undefined) {
   try {
-    if (isGitHub(url)) {
+    if (isIssueOrPrUrl(url)) {
       await chrome.sidePanel.setOptions({
         tabId,
         path: SIDE_PANEL_PATH,
