@@ -1,17 +1,13 @@
 #!/usr/bin/env bash
 # gh-pr-issue-summary の Native Messaging ホストをインストールする（macOS / Chrome）。
-# 使い方: ./install.sh <拡張ID>
-#   拡張IDは chrome://extensions（デベロッパーモード）で確認できる。
+# 使い方: ./install.sh            (拡張IDは manifest の key で固定済み)
+#         ./install.sh <拡張ID>   (別IDで上書きしたい場合のみ)
 set -euo pipefail
 
 HOST_NAME="com.m_tkg.gh_summary_host"
-EXT_ID="${1:-}"
-
-if [ -z "$EXT_ID" ]; then
-  echo "使い方: ./install.sh <拡張ID>"
-  echo "  拡張IDは chrome://extensions で確認してください。"
-  exit 1
-fi
+# manifest の key で固定された拡張ID（既定）。
+DEFAULT_EXT_ID="fhffjimobojofadknfdoggjaiodnhadb"
+EXT_ID="${1:-$DEFAULT_EXT_ID}"
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 HOST_JS="$DIR/gh_summary_host.mjs"

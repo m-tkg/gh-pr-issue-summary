@@ -41,14 +41,18 @@ Native Messaging 経由で「ネイティブホスト（ローカルの中継プ
 
 セットアップ（macOS）:
 1. 対象 CLI を導入・ログイン（`claude` / `codex` / `gemini`）
-2. `chrome://extensions` で本拡張の**拡張ID**を確認
-3. ネイティブホストを登録:
+2. ネイティブホストを登録（拡張IDは manifest の `key` で固定済みのため引数不要）:
    ```bash
    cd native-host
-   ./install.sh <拡張ID>
+   ./install.sh
    ```
    （CLI の絶対パス解決・Chrome へのホスト manifest 配置を行う）
+3. `chrome://extensions` で拡張を再読み込み（`key` により拡張IDが
+   `fhffjimobojofadknfdoggjaiodnhadb` に固定される）
 4. Chrome を再起動 → サイドパネルの「推論」を「ローカル CLI」にし、CLI を選択
+
+> 拡張IDは `manifest.config.ts` の `key`（公開鍵）で固定しています。ID を変えたい
+> 場合は鍵を再生成し、`key` と install.sh の `DEFAULT_EXT_ID` を更新してください。
 
 補足:
 - Codex は `--sandbox read-only` で実行します。
