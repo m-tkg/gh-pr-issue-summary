@@ -45,6 +45,12 @@ export function parseCodexOutput(raw) {
  * CLI ごとの起動仕様。prompt の渡し方（stdin/arg）と出力の解釈が異なる。
  * model が指定された場合は各 CLI のモデル指定フラグを付与する。
  */
+// 未信頼コメントによるプロンプトインジェクションでツールが悪用されるのを防ぐため、
+// 要約はツール無効・読み取り専用で実行する。
+// claude はファイル読取/書込/ネットワーク系ツールを明示的に禁止する。
+const CLAUDE_DISALLOWED_TOOLS =
+  'Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Read,Task,Glob,Grep,MultiEdit'
+
 export function cliSpec(cliKey, paths = {}, model = '') {
   const m = (model || '').trim()
   switch (cliKey) {
@@ -55,12 +61,15 @@ export function cliSpec(cliKey, paths = {}, model = '') {
           '-p',
           '--output-format',
           'text',
+          '--disallowed-tools',
+          CLAUDE_DISALLOWED_TOOLS,
           ...(m ? ['--model', m] : []),
         ],
         useStdin: true,
         parse: (raw) => raw.trim(),
       }
     case 'codex':
+      // read-only サンドボックスで実行（書込・ネットワーク実行を抑止）。
       return {
         bin: paths.codex || 'codex',
         args: () => [
@@ -75,9 +84,18 @@ export function cliSpec(cliKey, paths = {}, model = '') {
         parse: parseCodexOutput,
       }
     case 'gemini':
+      // plan モード = read-only（ツールで状態変更しない）。
       return {
         bin: paths.gemini || 'gemini',
-        args: (prompt) => ['-p', prompt, '-o', 'text', ...(m ? ['-m', m] : [])],
+        args: (prompt) => [
+          '-p',
+          prompt,
+          '-o',
+          'text',
+          '--approval-mode',
+          'plan',
+          ...(m ? ['-m', m] : []),
+        ],
         useStdin: false,
         parse: (raw) => raw.trim(),
       }
