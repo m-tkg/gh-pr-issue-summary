@@ -258,4 +258,47 @@ describe('renderSummary の図解セクション (diagram オプション)', () 
       expect(node.contains(c.el)).toBe(true)
     }
   })
+
+  it('flowSteps が無ければ「内容の流れ」details は出ない(Nano・旧キャッシュ)', () => {
+    const node = renderSummary(twoClusters, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    const details = [...node.querySelectorAll('.diagram-section details')]
+    const titles = details.map((d) => d.querySelector('summary')?.textContent)
+    expect(titles).not.toContain('内容の流れ')
+  })
+
+  it('flowSteps が 2 件以上あれば「内容の流れ」details が出る(閉)', () => {
+    const withFlow = {
+      ...twoClusters,
+      flowSteps: [
+        { label: '調査する', comments: [] },
+        { label: 'PRを作る', comments: [] },
+      ],
+    }
+    const node = renderSummary(withFlow, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    const details = [...node.querySelectorAll('.diagram-section details')]
+    expect(details).toHaveLength(3)
+    expect(details[2].querySelector('summary')?.textContent).toBe(
+      '内容の流れ',
+    )
+    expect((details[2] as HTMLDetailsElement).open).toBe(false)
+  })
+
+  it('flowSteps が 1 件以下なら「内容の流れ」details は出ない', () => {
+    const withFlow = {
+      ...twoClusters,
+      flowSteps: [{ label: '調査する', comments: [] }],
+    }
+    const node = renderSummary(withFlow, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    const details = [...node.querySelectorAll('.diagram-section details')]
+    expect(details).toHaveLength(2)
+  })
 })
