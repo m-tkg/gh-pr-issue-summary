@@ -6,11 +6,12 @@ import {
   summarize,
   summarizeSingleShot,
   buildParentAndLinks,
+  assembleFinalSummary,
 } from '../src/summarize/pipeline'
 import { truncateToTokens } from '../src/summarize/tokens'
 import type { CommentData, PageData } from '../src/content/extract'
 import { DEFAULT_PALETTE } from '../src/content/theme'
-import type { CommentNote } from '../src/summarize/types'
+import type { ClusterComment, CommentNote } from '../src/summarize/types'
 
 function comment(id: number, text: string, author = 'alice'): CommentData {
   return {
@@ -219,6 +220,122 @@ describe('reduceNotes 階層 reduce', () => {
       '/r/r/issues/1#issuecomment-1',
       '/r/r/issues/1#issuecomment-5',
     ])
+  })
+})
+
+describe('assembleFinalSummary の flowSteps 解析 (optional, CLI 限定)', () => {
+  function byOrdinal(...ordinals: number[]): Map<number, ClusterComment> {
+    return new Map(
+      ordinals.map((o) => [
+        o,
+        { url: `/r/r/issues/1#issuecomment-${o}`, ordinal: o, author: 'a' },
+      ]),
+    )
+  }
+  const baseObj = {
+    overview: 'ov',
+    overallDiscussion: 'od',
+    currentProgress: 'cp',
+    clusters: [],
+  }
+
+  it('flowSteps が無ければ summary.flowSteps は undefined', () => {
+    const summary = assembleFinalSummary(baseObj, page, 'ja', byOrdinal(1))
+    expect(summary.flowSteps).toBeUndefined()
+  })
+
+  it('flowSteps が配列でなければ undefined', () => {
+    const summary = assembleFinalSummary(
+      { ...baseObj, flowSteps: '不正' },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.flowSteps).toBeUndefined()
+  })
+
+  it('正常な flowSteps を label・comments に解決する', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...baseObj,
+        flowSteps: [
+          { label: '調査する', commentRefs: [1, 2] },
+          { label: '修正PRを作る', commentRefs: [3] },
+        ],
+      },
+      page,
+      'ja',
+      byOrdinal(1, 2, 3),
+    )
+    expect(summary.flowSteps).toHaveLength(2)
+    expect(summary.flowSteps?.[0].label).toBe('調査する')
+    expect(summary.flowSteps?.[0].comments.map((c) => c.ordinal)).toEqual([
+      1, 2,
+    ])
+    expect(summary.flowSteps?.[1].label).toBe('修正PRを作る')
+  })
+
+  it('label が 60 字を超える場合は 60 字に切り詰める', () => {
+    const summary = assembleFinalSummary(
+      { ...baseObj, flowSteps: [{ label: 'あ'.repeat(80), commentRefs: [] }] },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.flowSteps?.[0].label).toBe('あ'.repeat(60))
+  })
+
+  it('label が空・非文字列のステップは除外する', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...baseObj,
+        flowSteps: [
+          { label: '', commentRefs: [1] },
+          { label: 123, commentRefs: [1] },
+          { label: '有効なラベル', commentRefs: [1] },
+        ],
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.flowSteps).toHaveLength(1)
+    expect(summary.flowSteps?.[0].label).toBe('有効なラベル')
+  })
+
+  it('全ステップが不正なら flowSteps は undefined', () => {
+    const summary = assembleFinalSummary(
+      { ...baseObj, flowSteps: [{ label: '', commentRefs: [] }] },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.flowSteps).toBeUndefined()
+  })
+
+  it('10 件を超えるステップは先頭 10 件に足切りする', () => {
+    const steps = Array.from({ length: 15 }, (_, i) => ({
+      label: `手順${i}`,
+      commentRefs: [],
+    }))
+    const summary = assembleFinalSummary(
+      { ...baseObj, flowSteps: steps },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.flowSteps).toHaveLength(10)
+    expect(summary.flowSteps?.[9].label).toBe('手順9')
+  })
+
+  it('存在しない commentRefs は無視される（refsToComments と同じ規則）', () => {
+    const summary = assembleFinalSummary(
+      { ...baseObj, flowSteps: [{ label: 'X', commentRefs: [999] }] },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.flowSteps?.[0].comments).toEqual([])
   })
 })
 

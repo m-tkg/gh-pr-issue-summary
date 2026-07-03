@@ -45,6 +45,12 @@ export interface Cluster {
   comments: ClusterComment[]
 }
 
+/** やろうとしている作業・提案内容の 1 手順（CLI バックエンド限定の任意項目）。 */
+export interface FlowStep {
+  label: string
+  comments: ClusterComment[]
+}
+
 /** 最終要約結果。 */
 export interface FinalSummary {
   /** どのような issue/PR か。 */
@@ -57,4 +63,6 @@ export interface FinalSummary {
   currentProgress: string
   /** 議論のかたまり（重要度降順）。 */
   clusters: Cluster[]
+  /** 作業・提案内容の流れ（CLI バックエンドのみ生成、Nano では常に undefined）。 */
+  flowSteps?: FlowStep[]
 }

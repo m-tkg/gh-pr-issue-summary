@@ -15,6 +15,21 @@ export const NOTE_SCHEMA: Record<string, unknown> = {
   },
 }
 
+const CLUSTERS_SCHEMA: Record<string, unknown> = {
+  type: 'array',
+  items: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['title', 'summary', 'importance', 'commentRefs'],
+    properties: {
+      title: { type: 'string' },
+      summary: { type: 'string' },
+      importance: { type: 'string', enum: ['high', 'medium', 'low'] },
+      commentRefs: { type: 'array', items: { type: 'integer' } },
+    },
+  },
+}
+
 export const FINAL_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
@@ -23,16 +38,32 @@ export const FINAL_SCHEMA: Record<string, unknown> = {
     overview: { type: 'string' },
     overallDiscussion: { type: 'string' },
     currentProgress: { type: 'string' },
-    clusters: {
+    clusters: CLUSTERS_SCHEMA,
+  },
+}
+
+/**
+ * FINAL_SCHEMA に加えて flowSteps（やろうとしている作業・提案内容の手順）を
+ * 持つスキーマ。大コンテキストの CLI バックエンドの single-shot 要約でのみ使う。
+ * Gemini Nano の出力安定性への影響を避けるため FINAL_SCHEMA とは別定数にしている。
+ */
+export const FINAL_SCHEMA_WITH_FLOW: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['overview', 'overallDiscussion', 'currentProgress', 'clusters'],
+  properties: {
+    overview: { type: 'string' },
+    overallDiscussion: { type: 'string' },
+    currentProgress: { type: 'string' },
+    clusters: CLUSTERS_SCHEMA,
+    flowSteps: {
       type: 'array',
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['title', 'summary', 'importance', 'commentRefs'],
+        required: ['label', 'commentRefs'],
         properties: {
-          title: { type: 'string' },
-          summary: { type: 'string' },
-          importance: { type: 'string', enum: ['high', 'medium', 'low'] },
+          label: { type: 'string' },
           commentRefs: { type: 'array', items: { type: 'integer' } },
         },
       },
