@@ -247,3 +247,28 @@ h2 {
   margin: 4px 0;
   white-space: pre-wrap;
 }
+
+/* 図解 */
+.diagram-section details {
+  margin-bottom: 8px;
+}
+.diagram-section summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--fg-muted);
+  user-select: none;
+  margin-bottom: 4px;
+}
+.diagram-container {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--bg-muted);
+}
+.diagram-container svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}

@@ -42,6 +42,9 @@ import {
 } from './storage'
 import type { FinalSummary } from '../summarize/types'
 import { isIssueOrPrUrl } from '../shared/url'
+import { DEFAULT_PALETTE, type Palette } from '../content/theme'
+import type { DiagramTheme } from './diagram'
+import { renderDiagram } from './mermaidRenderer'
 import {
   el,
   applyPalette,
@@ -65,6 +68,13 @@ function rebuildLlm() {
     backend === 'cli'
       ? new NativeCliLlmClient(cli, model)
       : new ChromeLlmClient()
+}
+
+let currentPalette: Palette = DEFAULT_PALETTE
+
+/** 重要度別の図の色を GitHub テーマの色から決める。 */
+function diagramThemeFrom(palette: Palette): DiagramTheme {
+  return { high: palette.closed, medium: palette.accent, low: palette.fgMuted }
 }
 
 let pageData: PageData | null = null
@@ -254,6 +264,7 @@ async function applyThemeFast(tabId: number) {
     })
     if (res.ok) {
       applyPalette(res.theme)
+      currentPalette = res.theme
       void setCachedPalette(res.theme)
     }
   } catch {
@@ -315,7 +326,10 @@ function pageKey(p: PageData): string {
 
 function renderSummaryInto(summary: FinalSummary) {
   const old = document.getElementById('summary-root')
-  const node = renderSummary(summary, scrollToComment)
+  const node = renderSummary(summary, scrollToComment, {
+    theme: diagramThemeFrom(currentPalette),
+    render: (src, el) => renderDiagram(src, el, currentPalette),
+  })
   node.id = 'summary-root'
   if (old) old.replaceWith(node)
   else resultsRoot.append(node)
@@ -429,7 +443,10 @@ async function onSummarize() {
 async function init() {
   // 直近の配色を先に適用してライトのちらつきを防ぐ。
   const cached = await getCachedPalette()
-  if (cached) applyPalette(cached)
+  if (cached) {
+    applyPalette(cached)
+    currentPalette = cached
+  }
   lang = await getLanguage()
   backend = await getBackend()
   cli = await getCli()
