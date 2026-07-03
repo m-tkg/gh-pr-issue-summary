@@ -8,6 +8,7 @@ import type {
   CommentKind,
   CommentNote,
   FinalSummary,
+  FlowStep,
   Importance,
 } from './types'
 import { NOTE_SCHEMA, FINAL_SCHEMA } from './schema'
@@ -166,6 +167,32 @@ function parseClusters(
     .map(({ c }) => c)
 }
 
+const MAX_FLOW_STEPS = 10
+const FLOW_STEP_LABEL_MAX = 60
+
+/**
+ * flowSteps（CLI バックエンド限定・任意項目）を防御的に解析する。
+ * Nano の出力（FINAL_SCHEMA）には flowSteps キー自体が存在しないため、
+ * 常にこの関数を通しても Nano 経路には影響しない。
+ */
+function parseFlowSteps(
+  raw: unknown,
+  byOrdinal: Map<number, ClusterComment>,
+): FlowStep[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const steps = raw
+    .slice(0, MAX_FLOW_STEPS)
+    .map((s: Record<string, unknown>) => ({
+      label:
+        typeof s?.label === 'string'
+          ? s.label.trim().slice(0, FLOW_STEP_LABEL_MAX)
+          : '',
+      comments: refsToComments(s?.commentRefs, byOrdinal),
+    }))
+    .filter((s) => s.label.length > 0)
+  return steps.length > 0 ? steps : undefined
+}
+
 async function reduceOnce(
   llm: LlmClient,
   prompt: string,
@@ -216,12 +243,14 @@ export function assembleFinalSummary(
   lang: string,
   byOrdinal: Map<number, ClusterComment>,
 ): FinalSummary {
+  const flowSteps = parseFlowSteps(obj.flowSteps, byOrdinal)
   return {
     overview: String(obj.overview ?? ''),
     parentAndLinks: buildParentAndLinks(page, lang),
     overallDiscussion: String(obj.overallDiscussion ?? ''),
     currentProgress: String(obj.currentProgress ?? ''),
     clusters: parseClusters(obj, byOrdinal),
+    ...(flowSteps ? { flowSteps } : {}),
   }
 }
 
