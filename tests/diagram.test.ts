@@ -4,9 +4,15 @@ import {
   truncateLabel,
   buildStructureDiagram,
   buildTimelineDiagram,
+  buildContentFlowDiagram,
   type DiagramTheme,
 } from '../src/sidepanel/diagram'
-import type { Cluster, ClusterComment, FinalSummary } from '../src/summarize/types'
+import type {
+  Cluster,
+  ClusterComment,
+  FinalSummary,
+  FlowStep,
+} from '../src/summarize/types'
 
 const THEME: DiagramTheme = {
   high: '#e11d48',
@@ -22,6 +28,10 @@ function cluster(overrides: Partial<Cluster> = {}): Cluster {
     comments: [],
     ...overrides,
   }
+}
+
+function flowStep(overrides: Partial<FlowStep> = {}): FlowStep {
+  return { label: '手順', comments: [], ...overrides }
 }
 
 function comment(ordinal: number): ClusterComment {
@@ -265,5 +275,54 @@ describe('buildTimelineDiagram', () => {
       THEME,
     )
     expect(out).not.toContain('"] click')
+  })
+})
+
+describe('buildContentFlowDiagram', () => {
+  it('ステップが 0 件なら null を返す', () => {
+    expect(buildContentFlowDiagram([], THEME)).toBeNull()
+  })
+
+  it('ステップが 1 件なら null を返す', () => {
+    expect(buildContentFlowDiagram([flowStep()], THEME)).toBeNull()
+  })
+
+  it('flowchart LR で始まり、順番に鎖状接続する', () => {
+    const out = buildContentFlowDiagram(
+      [flowStep({ label: '調査する' }), flowStep({ label: 'PRを作る' })],
+      THEME,
+    )
+    expect(out).not.toBeNull()
+    expect((out as string).startsWith('flowchart LR')).toBe(true)
+    expect(out).toContain('調査する')
+    expect(out).toContain('PRを作る')
+    expect(out).toContain('s0 --> s1')
+  })
+
+  it('3 件以上でも順番どおりに鎖状接続する', () => {
+    const out = buildContentFlowDiagram(
+      [flowStep({ label: 'A' }), flowStep({ label: 'B' }), flowStep({ label: 'C' })],
+      THEME,
+    )
+    expect(out).toContain('s0 --> s1')
+    expect(out).toContain('s1 --> s2')
+  })
+
+  it('悪意あるラベルはエスケープされ、生の " が残らない', () => {
+    const malicious = '"] click s0 "javascript:alert(1)"'
+    const out = buildContentFlowDiagram(
+      [flowStep({ label: malicious }), flowStep({ label: 'B' })],
+      THEME,
+    )
+    expect(out).not.toContain('"] click')
+  })
+
+  it('長いラベルは省略される', () => {
+    const long = 'あ'.repeat(50)
+    const out = buildContentFlowDiagram(
+      [flowStep({ label: long }), flowStep({ label: 'B' })],
+      THEME,
+    )
+    expect(out).toContain('あ'.repeat(40) + '…')
   })
 })
