@@ -62,3 +62,26 @@ describe('プロンプト境界（インジェクション対策）', () => {
     expect(ends).toBe(1)
   })
 })
+
+describe('singleShotPrompt の flowSteps オプション (CLI 限定)', () => {
+  it('省略時は flowSteps の指示を含まない', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja')
+    expect(p).not.toContain('flowSteps')
+  })
+
+  it('includeFlowSteps: false でも含まない', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja', {
+      includeFlowSteps: false,
+    })
+    expect(p).not.toContain('flowSteps')
+  })
+
+  it('includeFlowSteps: true で flowSteps の指示を含む', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja', {
+      includeFlowSteps: true,
+    })
+    expect(p).toContain('flowSteps')
+    expect(p).toContain('label')
+    expect(p).toContain('commentRefs')
+  })
+})
