@@ -7,6 +7,7 @@ import type { Cluster, FinalSummary, Importance } from '../summarize/types'
 import {
   buildStructureDiagram,
   buildTimelineDiagram,
+  buildContentFlowDiagram,
   type DiagramTheme,
 } from './diagram'
 
@@ -212,6 +213,15 @@ function renderDiagramSection(
   if (timelineSrc) {
     wrap.append(
       renderDiagramDetails('時系列フロー', false, timelineSrc, diagram.render),
+    )
+  }
+  const flowSrc = buildContentFlowDiagram(
+    summary.flowSteps ?? [],
+    diagram.theme,
+  )
+  if (flowSrc) {
+    wrap.append(
+      renderDiagramDetails('内容の流れ', false, flowSrc, diagram.render),
     )
   }
   return wrap
