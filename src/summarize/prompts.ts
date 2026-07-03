@@ -100,10 +100,16 @@ export function reducePrompt(
 /** 単発要約（大コンテキストの CLI/モデル向け）: 全コメントを 1 回で構造化要約。 */
 export const SINGLESHOT_PER_COMMENT_TOKEN_BUDGET = 1500
 
+export interface SingleShotPromptOptions {
+  /** 作業・提案内容の flowSteps を生成させるか（CLI バックエンド限定）。 */
+  includeFlowSteps?: boolean
+}
+
 export function singleShotPrompt(
   page: PageData,
   comments: CommentData[],
   lang: string,
+  opts: SingleShotPromptOptions = {},
 ): string {
   const list = comments
     .map((c, i) => {
@@ -115,6 +121,13 @@ export function singleShotPrompt(
       return `[${i + 1}] (${meta})\n${body}`
     })
     .join('\n\n')
+
+  const flowStepsInstruction = opts.includeFlowSteps
+    ? [
+        `- flowSteps: やろうとしている作業・提案内容を 3〜7 個の短い手順に分けた配列（任意、無ければ省略可）。`,
+        `    各要素は label(string, 30 字以内) / commentRefs(その手順の根拠となる [番号] の整数配列) を持つ。`,
+      ]
+    : []
 
   return [
     `GitHub の ${page.type === 'pull' ? 'PR' : 'issue'} 「${page.title}」の議論を要約します。`,
@@ -141,6 +154,7 @@ export function singleShotPrompt(
     `    title(string) / summary(string) / importance("high"|"medium"|"low") /`,
     `    commentRefs(その論点に関係するコメントの [番号] の整数配列)`,
     `複数の論点があればまとまりごとに cluster を分けること。`,
+    ...flowStepsInstruction,
   ].join('\n')
 }
 

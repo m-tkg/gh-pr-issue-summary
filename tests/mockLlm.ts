@@ -8,6 +8,7 @@ import type {
 /** プロンプト文字列に応じて応答を返すモック LLM。テスト用。 */
 export class MockLlmClient implements LlmClient {
   public prompts: string[] = []
+  public promptOptions: (PromptOptions | undefined)[] = []
   public createdSessions = 0
 
   constructor(
@@ -25,9 +26,10 @@ export class MockLlmClient implements LlmClient {
     return {
       contextWindow: 6000,
       contextUsage: 0,
-      async prompt(text: string, _o?: PromptOptions): Promise<string> {
+      async prompt(text: string, o?: PromptOptions): Promise<string> {
         const idx = self.prompts.length
         self.prompts.push(text)
+        self.promptOptions.push(o)
         return self.responder(text, idx)
       },
       destroy() {},

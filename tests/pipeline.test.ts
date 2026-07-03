@@ -9,6 +9,7 @@ import {
   assembleFinalSummary,
 } from '../src/summarize/pipeline'
 import { truncateToTokens } from '../src/summarize/tokens'
+import { FINAL_SCHEMA, FINAL_SCHEMA_WITH_FLOW } from '../src/summarize/schema'
 import type { CommentData, PageData } from '../src/content/extract'
 import { DEFAULT_PALETTE } from '../src/content/theme'
 import type { ClusterComment, CommentNote } from '../src/summarize/types'
@@ -406,5 +407,41 @@ describe('summarizeSingleShot (大コンテキスト/CLI 向け 1 回要約)', (
       '/r/r/issues/1#issuecomment-11',
       '/r/r/issues/1#issuecomment-22',
     ])
+  })
+
+  it('includeFlowSteps: true のとき FINAL_SCHEMA_WITH_FLOW を使い、プロンプトに flowSteps 指示を含む', async () => {
+    const llm = new MockLlmClient(() =>
+      JSON.stringify({
+        overview: '概要',
+        overallDiscussion: '議論',
+        currentProgress: '進捗',
+        clusters: [],
+        flowSteps: [{ label: '調査する', commentRefs: [1] }],
+      }),
+    )
+    const comments = [comment(11, 'a')]
+    const { summary } = await summarizeSingleShot(llm, page, comments, {
+      lang: 'ja',
+      includeFlowSteps: true,
+    })
+    expect(llm.prompts[0]).toContain('flowSteps')
+    expect(llm.promptOptions[0]?.responseConstraint).toBe(
+      FINAL_SCHEMA_WITH_FLOW,
+    )
+    expect(summary.flowSteps?.[0].label).toBe('調査する')
+  })
+
+  it('includeFlowSteps 省略時は FINAL_SCHEMA を使い、プロンプトに flowSteps 指示を含まない', async () => {
+    const llm = new MockLlmClient(() =>
+      JSON.stringify({
+        overview: '概要',
+        overallDiscussion: '議論',
+        currentProgress: '進捗',
+        clusters: [],
+      }),
+    )
+    await summarizeSingleShot(llm, page, [comment(11, 'a')], { lang: 'ja' })
+    expect(llm.prompts[0]).not.toContain('flowSteps')
+    expect(llm.promptOptions[0]?.responseConstraint).toBe(FINAL_SCHEMA)
   })
 })
