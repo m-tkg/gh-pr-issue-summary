@@ -4,6 +4,11 @@ import type { PageData } from '../content/extract'
 import type { Palette } from '../content/theme'
 import type { Segment } from '../summarize/segment'
 import type { Cluster, FinalSummary, Importance } from '../summarize/types'
+import {
+  buildStructureDiagram,
+  buildTimelineDiagram,
+  type DiagramTheme,
+} from './diagram'
 
 /** GitHub ページの配色をサイドパネルの CSS 変数へ反映する。 */
 export function applyPalette(palette: Palette): void {
@@ -171,15 +176,61 @@ function section(title: string, body: string): HTMLElement {
   ])
 }
 
+export interface DiagramOptions {
+  theme: DiagramTheme
+  render: (src: string, container: HTMLElement) => Promise<void>
+}
+
+function renderDiagramDetails(
+  title: string,
+  open: boolean,
+  src: string,
+  renderFn: DiagramOptions['render'],
+): HTMLElement {
+  const container = el('div', { class: 'diagram-container' })
+  const details = el(
+    'details',
+    open ? { open: '' } : {},
+    [el('summary', {}, [title]), container],
+  )
+  void renderFn(src, container)
+  return details
+}
+
+function renderDiagramSection(
+  summary: FinalSummary,
+  diagram: DiagramOptions,
+): HTMLElement {
+  const wrap = el('section', { class: 'summary-section diagram-section' }, [
+    el('h2', {}, ['図解']),
+  ])
+  const structureSrc = buildStructureDiagram(summary, diagram.theme)
+  wrap.append(
+    renderDiagramDetails('議論の構造', true, structureSrc, diagram.render),
+  )
+  const timelineSrc = buildTimelineDiagram(summary, diagram.theme)
+  if (timelineSrc) {
+    wrap.append(
+      renderDiagramDetails('時系列フロー', false, timelineSrc, diagram.render),
+    )
+  }
+  return wrap
+}
+
 export function renderSummary(
   summary: FinalSummary,
   onLinkClick: (commentId: string) => void,
+  diagram?: DiagramOptions,
 ): HTMLElement {
   const wrap = el('div', { class: 'summary' })
   wrap.append(section('概要', summary.overview))
   wrap.append(section('親・関連', summary.parentAndLinks))
   wrap.append(section('全体の議論', summary.overallDiscussion))
   wrap.append(section('現状の進捗', summary.currentProgress))
+
+  if (diagram) {
+    wrap.append(renderDiagramSection(summary, diagram))
+  }
 
   const clustersWrap = el('section', { class: 'summary-section' }, [
     el('h2', {}, [`議論のかたまり (${summary.clusters.length})`]),
