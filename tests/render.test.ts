@@ -163,3 +163,99 @@ describe('renderSummary', () => {
     expect(onLink).toHaveBeenCalledWith('issuecomment-10')
   })
 })
+
+describe('renderSummary の図解セクション (diagram オプション)', () => {
+  const oneCluster: FinalSummary = {
+    overview: '概要',
+    parentAndLinks: '',
+    overallDiscussion: '',
+    currentProgress: '進捗',
+    clusters: [
+      { title: '論点A', summary: 'a', importance: 'high', comments: [] },
+    ],
+  }
+  const twoClusters: FinalSummary = {
+    ...oneCluster,
+    clusters: [
+      ...oneCluster.clusters,
+      { title: '論点B', summary: 'b', importance: 'low', comments: [] },
+    ],
+  }
+  const THEME = { high: '#e11d48', medium: '#d97706', low: '#6b7280' }
+
+  it('diagram オプション省略時は図解セクションが無い(後方互換)', () => {
+    const node = renderSummary(oneCluster, () => {})
+    const headings = [...node.querySelectorAll('h2')].map((h) => h.textContent)
+    expect(headings).not.toContain('図解')
+  })
+
+  it('diagram オプション省略時は従来と同一の見出し構成', () => {
+    const withDiagram = renderSummary(oneCluster, () => {})
+    const headings = [...withDiagram.querySelectorAll('h2')].map(
+      (h) => h.textContent,
+    )
+    expect(headings).toEqual([
+      '概要',
+      '親・関連',
+      '全体の議論',
+      '現状の進捗',
+      '議論のかたまり (1)',
+    ])
+  })
+
+  it('diagram 指定時「図解」が現状の進捗の後・議論のかたまりの前に出る', () => {
+    const node = renderSummary(oneCluster, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    const headings = [...node.querySelectorAll('h2')].map((h) => h.textContent)
+    expect(headings).toEqual([
+      '概要',
+      '親・関連',
+      '全体の議論',
+      '現状の進捗',
+      '図解',
+      '議論のかたまり (1)',
+    ])
+  })
+
+  it('議論の構造 details は open、時系列フローはクラスタ1件では出ない', () => {
+    const node = renderSummary(oneCluster, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    const details = [...node.querySelectorAll('.diagram-section details')]
+    expect(details).toHaveLength(1)
+    expect(details[0].querySelector('summary')?.textContent).toBe('議論の構造')
+    expect((details[0] as HTMLDetailsElement).open).toBe(true)
+  })
+
+  it('クラスタが 2 件以上なら時系列フロー details も出る(閉)', () => {
+    const node = renderSummary(twoClusters, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    const details = [...node.querySelectorAll('.diagram-section details')]
+    expect(details).toHaveLength(2)
+    expect(details[1].querySelector('summary')?.textContent).toBe(
+      '時系列フロー',
+    )
+    expect((details[1] as HTMLDetailsElement).open).toBe(false)
+  })
+
+  it('render 関数がそれぞれのコンテナと mermaid ソースで呼ばれる', () => {
+    const calls: { src: string; el: HTMLElement }[] = []
+    const node = renderSummary(twoClusters, () => {}, {
+      theme: THEME,
+      render: async (src, el) => {
+        calls.push({ src, el })
+      },
+    })
+    expect(calls).toHaveLength(2)
+    expect(calls[0].src.startsWith('flowchart TD')).toBe(true)
+    expect(calls[1].src.startsWith('flowchart LR')).toBe(true)
+    for (const c of calls) {
+      expect(node.contains(c.el)).toBe(true)
+    }
+  })
+})
