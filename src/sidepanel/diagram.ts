@@ -86,3 +86,34 @@ export function buildStructureDiagram(
 
   return lines.join('\n')
 }
+
+function ordinalRangeSuffix(comments: { ordinal: number }[]): string {
+  if (comments.length === 0) return ''
+  const min = comments[0].ordinal
+  const max = comments[comments.length - 1].ordinal
+  return min === max ? ` #${min}` : ` #${min}〜#${max}`
+}
+
+/**
+ * 議論の時系列フロー（クラスタを最早コメント序数の昇順で鎖状接続）を組み立てる。
+ * クラスタが 1 件以下では時系列を示す意味が無いため null を返す。
+ */
+export function buildTimelineDiagram(
+  summary: FinalSummary,
+  theme: DiagramTheme,
+): string | null {
+  if (summary.clusters.length <= 1) return null
+
+  const lines = ['flowchart LR']
+  summary.clusters.forEach((c, i) => {
+    const text = label(c.title) + ordinalRangeSuffix(c.comments)
+    lines.push(`c${i}["${text}"]`)
+  })
+  for (let i = 0; i < summary.clusters.length - 1; i++) {
+    lines.push(`c${i} --> c${i + 1}`)
+  }
+  lines.push(`classDef step stroke:${theme.medium}`)
+  summary.clusters.forEach((_c, i) => lines.push(`class c${i} step`))
+
+  return lines.join('\n')
+}

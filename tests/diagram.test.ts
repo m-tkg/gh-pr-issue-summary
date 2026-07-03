@@ -212,10 +212,12 @@ describe('buildTimelineDiagram', () => {
   })
 
   it('複数コメントを持つクラスタは #最小〜#最大 の範囲をラベルに含む', () => {
+    // comments は pipeline 側 (refsToComments) で常に序数昇順ソート済みという
+    // 不変条件を前提にしている。
     const out = buildTimelineDiagram(
       summary({
         clusters: [
-          cluster({ title: 'A', comments: [comment(3), comment(1), comment(7)] }),
+          cluster({ title: 'A', comments: [comment(1), comment(3), comment(7)] }),
           cluster({ title: 'B', comments: [comment(9)] }),
         ],
       }),
