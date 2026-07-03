@@ -1,4 +1,4 @@
-import type { FinalSummary } from '../summarize/types'
+import type { FinalSummary, FlowStep } from '../summarize/types'
 
 // FinalSummary から mermaid ソースを決定的に組み立てる純粋関数群。
 // LLM には mermaid コードを直接書かせない（構文エラーを原理的に排除するため）。
@@ -114,6 +114,29 @@ export function buildTimelineDiagram(
   }
   lines.push(`classDef step stroke:${theme.medium}`)
   summary.clusters.forEach((_c, i) => lines.push(`class c${i} step`))
+
+  return lines.join('\n')
+}
+
+/**
+ * やろうとしている作業・提案内容の流れ（CLI バックエンド限定・任意）を
+ * 鎖状接続の flowchart LR として組み立てる。1 件以下では意味が無いため null。
+ */
+export function buildContentFlowDiagram(
+  steps: FlowStep[],
+  theme: DiagramTheme,
+): string | null {
+  if (steps.length <= 1) return null
+
+  const lines = ['flowchart LR']
+  steps.forEach((s, i) => {
+    lines.push(`s${i}["${label(s.label)}"]`)
+  })
+  for (let i = 0; i < steps.length - 1; i++) {
+    lines.push(`s${i} --> s${i + 1}`)
+  }
+  lines.push(`classDef step stroke:${theme.medium}`)
+  steps.forEach((_s, i) => lines.push(`class s${i} step`))
 
   return lines.join('\n')
 }
