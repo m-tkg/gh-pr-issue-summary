@@ -3,9 +3,10 @@ import {
   escapeLabel,
   truncateLabel,
   buildStructureDiagram,
+  buildTimelineDiagram,
   type DiagramTheme,
 } from '../src/sidepanel/diagram'
-import type { Cluster, FinalSummary } from '../src/summarize/types'
+import type { Cluster, ClusterComment, FinalSummary } from '../src/summarize/types'
 
 const THEME: DiagramTheme = {
   high: '#e11d48',
@@ -20,6 +21,14 @@ function cluster(overrides: Partial<Cluster> = {}): Cluster {
     importance: 'medium',
     comments: [],
     ...overrides,
+  }
+}
+
+function comment(ordinal: number): ClusterComment {
+  return {
+    url: `https://example.com/issue#issuecomment-${ordinal}`,
+    ordinal,
+    author: 'someone',
   }
 }
 
@@ -171,5 +180,88 @@ describe('buildStructureDiagram', () => {
     expect(out).toContain('他 3 件')
     expect(out).toContain('ov --> cmore')
     expect(out).toContain('cmore --> pg')
+  })
+})
+
+describe('buildTimelineDiagram', () => {
+  it('クラスタが 0 件なら null を返す', () => {
+    expect(buildTimelineDiagram(summary({ clusters: [] }), THEME)).toBeNull()
+  })
+
+  it('クラスタが 1 件なら null を返す', () => {
+    const out = buildTimelineDiagram(
+      summary({ clusters: [cluster({ comments: [comment(1)] })] }),
+      THEME,
+    )
+    expect(out).toBeNull()
+  })
+
+  it('flowchart LR で始まり、既ソート順に鎖状接続する', () => {
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: '最初の論点', comments: [comment(1), comment(3)] }),
+          cluster({ title: '次の論点', comments: [comment(5)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).not.toBeNull()
+    expect((out as string).startsWith('flowchart LR')).toBe(true)
+    expect(out).toContain('c0 --> c1')
+  })
+
+  it('複数コメントを持つクラスタは #最小〜#最大 の範囲をラベルに含む', () => {
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: 'A', comments: [comment(3), comment(1), comment(7)] }),
+          cluster({ title: 'B', comments: [comment(9)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).toContain('#1〜#7')
+  })
+
+  it('単一コメントのクラスタは範囲でなく単一の # 番号のみ', () => {
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: 'A', comments: [comment(9)] }),
+          cluster({ title: 'B', comments: [comment(1), comment(2)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).toContain('#9')
+    expect(out).not.toContain('#9〜')
+  })
+
+  it('該当コメントが無いクラスタは番号なしでラベルに出る', () => {
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: 'A', comments: [] }),
+          cluster({ title: 'B', comments: [comment(1), comment(2)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).toContain('"A"')
+  })
+
+  it('悪意あるタイトルはエスケープされる', () => {
+    const malicious = '"] click c0 "javascript:alert(1)"'
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: malicious, comments: [comment(1)] }),
+          cluster({ title: 'B', comments: [comment(2)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).not.toContain('"] click')
   })
 })
