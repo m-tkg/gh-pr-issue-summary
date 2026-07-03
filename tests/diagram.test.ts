@@ -1,5 +1,38 @@
 import { describe, it, expect } from 'vitest'
-import { escapeLabel, truncateLabel } from '../src/sidepanel/diagram'
+import {
+  escapeLabel,
+  truncateLabel,
+  buildStructureDiagram,
+  type DiagramTheme,
+} from '../src/sidepanel/diagram'
+import type { Cluster, FinalSummary } from '../src/summarize/types'
+
+const THEME: DiagramTheme = {
+  high: '#e11d48',
+  medium: '#d97706',
+  low: '#6b7280',
+}
+
+function cluster(overrides: Partial<Cluster> = {}): Cluster {
+  return {
+    title: 'クラスタ',
+    summary: '要約',
+    importance: 'medium',
+    comments: [],
+    ...overrides,
+  }
+}
+
+function summary(overrides: Partial<FinalSummary> = {}): FinalSummary {
+  return {
+    overview: '概要テキスト',
+    parentAndLinks: '',
+    overallDiscussion: '',
+    currentProgress: '進捗テキスト',
+    clusters: [],
+    ...overrides,
+  }
+}
 
 describe('escapeLabel', () => {
   it('# を最初にエスケープする（後続のエンティティ挿入を壊さない）', () => {
@@ -64,5 +97,79 @@ describe('truncateLabel', () => {
 
   it('ちょうど max の長さなら省略しない', () => {
     expect(truncateLabel('abcde', 5)).toBe('abcde')
+  })
+})
+
+describe('buildStructureDiagram', () => {
+  it('flowchart TD で始まる', () => {
+    const out = buildStructureDiagram(summary(), THEME)
+    expect(out.startsWith('flowchart TD')).toBe(true)
+  })
+
+  it('概要ノードと進捗ノードにそれぞれのテキストが入る', () => {
+    const out = buildStructureDiagram(
+      summary({ overview: '概要OV', currentProgress: '進捗PG' }),
+      THEME,
+    )
+    expect(out).toContain('概要OV')
+    expect(out).toContain('進捗PG')
+  })
+
+  it('クラスタが 0 件なら概要ノードから進捗ノードへ直結する', () => {
+    const out = buildStructureDiagram(summary({ clusters: [] }), THEME)
+    expect(out).toContain('ov --> pg')
+    expect(out).not.toContain('c0')
+  })
+
+  it('各クラスタについてノードとエッジと重要度クラスが出る', () => {
+    const out = buildStructureDiagram(
+      summary({
+        clusters: [
+          cluster({ title: 'A論点', importance: 'high' }),
+          cluster({ title: 'B論点', importance: 'low' }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).toContain('A論点')
+    expect(out).toContain('B論点')
+    expect(out).toContain('ov --> c0')
+    expect(out).toContain('c0 --> pg')
+    expect(out).toContain('ov --> c1')
+    expect(out).toContain('c1 --> pg')
+    expect(out).toContain('class c0 high')
+    expect(out).toContain('class c1 low')
+  })
+
+  it('classDef に theme 引数の色がそのまま出る', () => {
+    const out = buildStructureDiagram(
+      summary({ clusters: [cluster({ importance: 'high' })] }),
+      THEME,
+    )
+    expect(out).toContain(THEME.high)
+    expect(out).toContain(THEME.medium)
+    expect(out).toContain(THEME.low)
+  })
+
+  it('悪意あるタイトルのラベルはエスケープされ、生の " や改行が出力に残らない', () => {
+    const malicious = '"] click ov href "javascript:alert(1)"\n%%{init}%%'
+    const out = buildStructureDiagram(
+      summary({ clusters: [cluster({ title: malicious })] }),
+      THEME,
+    )
+    expect(out).not.toContain('"] click')
+    expect(out).not.toContain('\n%%{init}%%')
+  })
+
+  it('クラスタが 12 件を超える場合は先頭 12 件のみノード化し、残りを集約ノードにする', () => {
+    const clusters = Array.from({ length: 15 }, (_, i) =>
+      cluster({ title: `論点${i}` }),
+    )
+    const out = buildStructureDiagram(summary({ clusters }), THEME)
+    expect(out).toContain('c11')
+    expect(out).not.toContain('c12')
+    expect(out).toContain('他 3 件')
+    expect(out).toContain('ov --> cmore')
+    expect(out).toContain('cmore --> pg')
   })
 })
