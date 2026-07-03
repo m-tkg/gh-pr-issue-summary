@@ -11,7 +11,7 @@ import type {
   FlowStep,
   Importance,
 } from './types'
-import { NOTE_SCHEMA, FINAL_SCHEMA } from './schema'
+import { NOTE_SCHEMA, FINAL_SCHEMA, FINAL_SCHEMA_WITH_FLOW } from './schema'
 import {
   systemPrompt,
   mapPrompt,
@@ -61,6 +61,8 @@ export interface SummarizeOptions {
   signal?: AbortSignal
   /** map 結果の再利用キャッシュ（任意）。 */
   noteCache?: NoteCache
+  /** flowSteps を生成させるか（summarizeSingleShot のみで有効。CLI バックエンド限定）。 */
+  includeFlowSteps?: boolean
 }
 
 /** コメント 1 件を圧縮メモ化する。 */
@@ -374,8 +376,15 @@ export async function summarizeSingleShot(
   try {
     opts.onProgress?.(0, 1, 'reduce')
     const raw = await session.prompt(
-      singleShotPrompt(page, comments, opts.lang),
-      { responseConstraint: FINAL_SCHEMA, signal: opts.signal },
+      singleShotPrompt(page, comments, opts.lang, {
+        includeFlowSteps: opts.includeFlowSteps,
+      }),
+      {
+        responseConstraint: opts.includeFlowSteps
+          ? FINAL_SCHEMA_WITH_FLOW
+          : FINAL_SCHEMA,
+        signal: opts.signal,
+      },
     )
     const obj = parseJson(raw) as Record<string, unknown>
     const byOrdinal = new Map<number, ClusterComment>(
