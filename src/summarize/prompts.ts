@@ -132,11 +132,13 @@ export function singleShotPrompt(
     ? [
         `- flowSteps: この PR/issue で実現しようとしている変更・提案の流れを、`,
         `  読者が図だけで全体像を掴めるように 3〜7 個の手順に分けた配列（任意、無ければ省略可）。`,
-        `  各要素は label / commentRefs を持つ。`,
+        `  各要素は label / kind / commentRefs を持つ。`,
         `    label(string, 30 字以内): 図のノードラベルとしてそのまま表示される。`,
         `      「何を」「どうする」を必ず含め、関数名・API 名などの固有名詞を優先して使う。`,
         `      悪い例:「実装する」「テストを書く」「修正」`,
         `      良い例:「parseFlowSteps に enum 検証を追加」「fallback を旧 API に切替」`,
+        `    kind: 作業なら "action"、判断・分岐なら "decision"、`,
+        `      成果・結論なら "outcome"（迷えば省略可）。`,
         `    commentRefs: その手順の根拠となる [番号] の整数配列。`,
       ]
     : []
