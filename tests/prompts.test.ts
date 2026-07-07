@@ -144,6 +144,26 @@ describe('図解ノードラベルの品質指示', () => {
   })
 })
 
+describe('problemStructure の指示 (CLI 限定)', () => {
+  it('includeExtendedFields: true のとき problemStructure の指示を含む', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja', {
+      includeExtendedFields: true,
+    })
+    expect(p).toContain('problemStructure')
+    expect(p).toContain('problem')
+    expect(p).toContain('causes')
+    expect(p).toContain('impacts')
+    expect(p).toContain('goal')
+    // ラベル品質の指示（ノードラベル・字数）も含む
+    expect(p).toMatch(/problemStructure[\s\S]*25 字/)
+  })
+
+  it('省略時は problemStructure の指示を含まない', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja')
+    expect(p).not.toContain('problemStructure')
+  })
+})
+
 describe('cluster.status の指示 (CLI 限定)', () => {
   it('includeExtendedFields: true のとき status の指示を含む', () => {
     const p = singleShotPrompt(page, [comment('hi')], 'ja', {
