@@ -205,6 +205,17 @@ function renderDiagramSection(
   const wrap = el('section', { class: 'summary-section diagram-section' }, [
     el('h2', {}, ['図解']),
   ])
+  // status / kind の視覚表現がある場合のみ凡例を出す（Nano・旧キャッシュでは不要）。
+  const hasMarks =
+    summary.clusters.some((c) => c.status) ||
+    (summary.flowSteps ?? []).some((s) => s.kind)
+  if (hasMarks) {
+    wrap.append(
+      el('p', { class: 'muted diagram-legend' }, [
+        '✓=決着済み ・ 点線=未決 ・ ひし形=判断 ・ 角丸=成果',
+      ]),
+    )
+  }
   const structureSrc = buildStructureDiagram(summary, diagram.theme)
   wrap.append(
     renderDiagramDetails('議論の構造', true, structureSrc, diagram.render),
