@@ -191,6 +191,35 @@ describe('buildStructureDiagram', () => {
     expect(out).toContain('ov --> cmore')
     expect(out).toContain('cmore --> pg')
   })
+
+  it('status: resolved のクラスタはラベル末尾に ✓ が付く', () => {
+    const out = buildStructureDiagram(
+      summary({ clusters: [cluster({ title: 'A論点', status: 'resolved' })] }),
+      THEME,
+    )
+    expect(out).toContain('c0["A論点 ✓"]')
+  })
+
+  it('status: open のクラスタは点線クラスが付き、重要度クラスと共存する', () => {
+    const out = buildStructureDiagram(
+      summary({
+        clusters: [cluster({ title: 'A論点', importance: 'high', status: 'open' })],
+      }),
+      THEME,
+    )
+    expect(out).toContain('classDef stOpen stroke-dasharray')
+    expect(out).toContain('class c0 stOpen')
+    expect(out).toContain('class c0 high')
+  })
+
+  it('status 無しのクラスタのみなら従来出力と完全一致（✓ も stOpen も出ない）', () => {
+    const out = buildStructureDiagram(
+      summary({ clusters: [cluster({ title: 'A論点' })] }),
+      THEME,
+    )
+    expect(out).not.toContain('✓')
+    expect(out).not.toContain('stOpen')
+  })
 })
 
 describe('buildTimelineDiagram', () => {
