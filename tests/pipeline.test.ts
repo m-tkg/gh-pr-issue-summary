@@ -338,6 +338,31 @@ describe('assembleFinalSummary の flowSteps 解析 (optional, CLI 限定)', () 
     )
     expect(summary.flowSteps?.[0].comments).toEqual([])
   })
+
+  it('kind(action/decision/outcome) は採用され、不正値・欠落は undefined', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...baseObj,
+        flowSteps: [
+          { label: 'A', kind: 'action', commentRefs: [] },
+          { label: 'B', kind: 'decision', commentRefs: [] },
+          { label: 'C', kind: 'outcome', commentRefs: [] },
+          { label: 'D', kind: 'unknown', commentRefs: [] },
+          { label: 'E', commentRefs: [] },
+        ],
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.flowSteps?.map((s) => s.kind)).toEqual([
+      'action',
+      'decision',
+      'outcome',
+      undefined,
+      undefined,
+    ])
+  })
 })
 
 describe('cluster.status の防御的パース (optional, CLI 限定)', () => {
@@ -419,6 +444,19 @@ describe('スキーマの status フィールド (Nano 安定性の保護)', () 
       enum: ['resolved', 'open'],
     })
     expect(items.required).not.toContain('status')
+  })
+
+  it('FINAL_SCHEMA_WITH_FLOW の flowSteps に kind enum があり required ではない', () => {
+    const props = FINAL_SCHEMA_WITH_FLOW.properties as Record<
+      string,
+      { items: { required: string[]; properties: Record<string, unknown> } }
+    >
+    const items = props.flowSteps.items
+    expect(items.properties.kind).toEqual({
+      type: 'string',
+      enum: ['action', 'decision', 'outcome'],
+    })
+    expect(items.required).not.toContain('kind')
   })
 })
 
