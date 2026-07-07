@@ -421,6 +421,130 @@ describe('cluster.status の防御的パース (optional, CLI 限定)', () => {
   })
 })
 
+describe('assembleFinalSummary の problemStructure 解析 (optional, CLI 限定)', () => {
+  function byOrdinal(...ordinals: number[]): Map<number, ClusterComment> {
+    return new Map(
+      ordinals.map((o) => [
+        o,
+        { url: `/r/r/issues/1#issuecomment-${o}`, ordinal: o, author: 'a' },
+      ]),
+    )
+  }
+  const base = {
+    overview: 'ov',
+    overallDiscussion: 'od',
+    currentProgress: 'cp',
+    clusters: [],
+  }
+
+  it('無ければ undefined', () => {
+    const summary = assembleFinalSummary(base, page, 'ja', byOrdinal(1))
+    expect(summary.problemStructure).toBeUndefined()
+  })
+
+  it('オブジェクトでなければ undefined', () => {
+    const summary = assembleFinalSummary(
+      { ...base, problemStructure: '不正' },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.problemStructure).toBeUndefined()
+  })
+
+  it('正常系: problem/causes/impacts/goal を解決する', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        problemStructure: {
+          problem: 'ビルドが遅い',
+          causes: [{ label: '依存が多い', commentRefs: [1] }],
+          impacts: [{ label: 'CI が 30 分かかる', commentRefs: [2] }],
+          goal: 'CI を 10 分以内にする',
+        },
+      },
+      page,
+      'ja',
+      byOrdinal(1, 2),
+    )
+    const ps = summary.problemStructure
+    expect(ps?.problem).toBe('ビルドが遅い')
+    expect(ps?.causes[0].label).toBe('依存が多い')
+    expect(ps?.causes[0].comments.map((c) => c.ordinal)).toEqual([1])
+    expect(ps?.impacts[0].label).toBe('CI が 30 分かかる')
+    expect(ps?.goal).toBe('CI を 10 分以内にする')
+  })
+
+  it('problem が空なら undefined', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        problemStructure: {
+          problem: ' ',
+          causes: [{ label: 'x', commentRefs: [] }],
+          impacts: [],
+        },
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.problemStructure).toBeUndefined()
+  })
+
+  it('causes/impacts/goal がすべて空なら undefined（図にならない）', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        problemStructure: { problem: 'P', causes: [], impacts: [] },
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.problemStructure).toBeUndefined()
+  })
+
+  it('goal だけあれば成立する（problem → goal の 2 ノード）', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        problemStructure: { problem: 'P', causes: [], impacts: [], goal: 'G' },
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.problemStructure?.goal).toBe('G')
+  })
+
+  it('causes は 4 件に足切りされ、空ラベルは除外される', () => {
+    const causes = Array.from({ length: 6 }, (_, i) => ({
+      label: `原因${i}`,
+      commentRefs: [],
+    }))
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        problemStructure: {
+          problem: 'P',
+          causes: [{ label: ' ', commentRefs: [] }, ...causes],
+          impacts: [],
+        },
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.problemStructure?.causes.map((c) => c.label)).toEqual([
+      '原因0',
+      '原因1',
+      '原因2',
+      '原因3',
+    ])
+  })
+})
+
 describe('スキーマの status フィールド (Nano 安定性の保護)', () => {
   function clusterItems(schema: Record<string, unknown>): {
     required: string[]
@@ -444,6 +568,17 @@ describe('スキーマの status フィールド (Nano 安定性の保護)', () 
       enum: ['resolved', 'open'],
     })
     expect(items.required).not.toContain('status')
+  })
+
+  it('FINAL_SCHEMA に problemStructure は無く、WITH_FLOW にはあり required ではない', () => {
+    const props = FINAL_SCHEMA.properties as Record<string, unknown>
+    expect(props).not.toHaveProperty('problemStructure')
+    const flowProps = FINAL_SCHEMA_WITH_FLOW.properties as Record<
+      string,
+      unknown
+    >
+    expect(flowProps).toHaveProperty('problemStructure')
+    expect(FINAL_SCHEMA_WITH_FLOW.required).not.toContain('problemStructure')
   })
 
   it('FINAL_SCHEMA_WITH_FLOW の flowSteps に kind enum があり required ではない', () => {
