@@ -154,7 +154,15 @@ export function buildContentFlowDiagram(
 
   const lines = ['flowchart LR']
   steps.forEach((s, i) => {
-    lines.push(`s${i}["${label(s.label)}"]`)
+    const text = label(s.label)
+    // kind に応じたノード形状。ラベルは常にエスケープ済みで引用符内。
+    if (s.kind === 'decision') {
+      lines.push(`s${i}{"${text}"}`)
+    } else if (s.kind === 'outcome') {
+      lines.push(`s${i}(["${text}"])`)
+    } else {
+      lines.push(`s${i}["${text}"]`)
+    }
   })
   for (let i = 0; i < steps.length - 1; i++) {
     lines.push(`s${i} --> s${i + 1}`)
