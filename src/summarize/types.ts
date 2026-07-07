@@ -36,11 +36,16 @@ export interface ClusterComment {
   timestampISO?: string
 }
 
+/** 論点の決着状況（CLI バックエンド限定の任意項目）。 */
+export type ClusterStatus = 'resolved' | 'open'
+
 /** 議論のかたまり。 */
 export interface Cluster {
   title: string
   summary: string
   importance: Importance
+  /** 決着済みか未決か（CLI バックエンドのみ生成、Nano では常に undefined）。 */
+  status?: ClusterStatus
   /** 該当コメント一覧（序数・投稿者・日時付き）。 */
   comments: ClusterComment[]
 }

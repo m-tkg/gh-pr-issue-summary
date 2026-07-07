@@ -15,6 +15,7 @@ export const NOTE_SCHEMA: Record<string, unknown> = {
   },
 }
 
+// Gemini Nano 用。出力安定性への影響を避けるためフィールドを増やさない。
 const CLUSTERS_SCHEMA: Record<string, unknown> = {
   type: 'array',
   items: {
@@ -25,6 +26,23 @@ const CLUSTERS_SCHEMA: Record<string, unknown> = {
       title: { type: 'string' },
       summary: { type: 'string' },
       importance: { type: 'string', enum: ['high', 'medium', 'low'] },
+      commentRefs: { type: 'array', items: { type: 'integer' } },
+    },
+  },
+}
+
+// CLI バックエンド用。status（決着状況）を任意項目として追加で持つ。
+const CLUSTERS_SCHEMA_WITH_STATUS: Record<string, unknown> = {
+  type: 'array',
+  items: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['title', 'summary', 'importance', 'commentRefs'],
+    properties: {
+      title: { type: 'string' },
+      summary: { type: 'string' },
+      importance: { type: 'string', enum: ['high', 'medium', 'low'] },
+      status: { type: 'string', enum: ['resolved', 'open'] },
       commentRefs: { type: 'array', items: { type: 'integer' } },
     },
   },
@@ -55,7 +73,7 @@ export const FINAL_SCHEMA_WITH_FLOW: Record<string, unknown> = {
     overview: { type: 'string' },
     overallDiscussion: { type: 'string' },
     currentProgress: { type: 'string' },
-    clusters: CLUSTERS_SCHEMA,
+    clusters: CLUSTERS_SCHEMA_WITH_STATUS,
     flowSteps: {
       type: 'array',
       items: {

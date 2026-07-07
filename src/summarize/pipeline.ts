@@ -5,6 +5,7 @@ import type { LlmClient } from './llmClient'
 import type {
   Cluster,
   ClusterComment,
+  ClusterStatus,
   CommentKind,
   CommentNote,
   FinalSummary,
@@ -44,6 +45,15 @@ function coerceImportance(v: unknown): Importance {
   return VALID_IMPORTANCE.includes(v as Importance)
     ? (v as Importance)
     : 'medium'
+}
+
+const VALID_STATUS: ClusterStatus[] = ['resolved', 'open']
+
+/** 不正値・欠落は undefined（従来表示）にフォールバックする。 */
+function coerceStatus(v: unknown): ClusterStatus | undefined {
+  return VALID_STATUS.includes(v as ClusterStatus)
+    ? (v as ClusterStatus)
+    : undefined
 }
 
 export interface ProgressCallback {
@@ -152,12 +162,16 @@ function parseClusters(
   byOrdinal: Map<number, ClusterComment>,
 ): Cluster[] {
   const raw = Array.isArray(obj.clusters) ? obj.clusters : []
-  const clusters: Cluster[] = raw.map((c: Record<string, unknown>) => ({
-    title: String(c.title ?? ''),
-    summary: String(c.summary ?? ''),
-    importance: coerceImportance(c.importance),
-    comments: refsToComments(c.commentRefs, byOrdinal),
-  }))
+  const clusters: Cluster[] = raw.map((c: Record<string, unknown>) => {
+    const status = coerceStatus(c.status)
+    return {
+      title: String(c.title ?? ''),
+      summary: String(c.summary ?? ''),
+      importance: coerceImportance(c.importance),
+      ...(status ? { status } : {}),
+      comments: refsToComments(c.commentRefs, byOrdinal),
+    }
+  })
   // 議論のかたまりを時系列に並べる（各クラスタの最早コメント序数の昇順）。
   // 部分要約を任意の順で実行しても、表示は常に時系列になる。
   // 該当コメントが無いクラスタは末尾へ。元の順序を保つ安定ソート。
