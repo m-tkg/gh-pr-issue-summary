@@ -301,4 +301,30 @@ describe('renderSummary の図解セクション (diagram オプション)', () 
     const details = [...node.querySelectorAll('.diagram-section details')]
     expect(details).toHaveLength(2)
   })
+
+  it('status や kind があれば図解セクションに凡例が出る', () => {
+    const withMarks = {
+      ...twoClusters,
+      clusters: [
+        { ...twoClusters.clusters[0], status: 'resolved' as const },
+        twoClusters.clusters[1],
+      ],
+    }
+    const node = renderSummary(withMarks, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    const legend = node.querySelector('.diagram-section .diagram-legend')
+    expect(legend).not.toBeNull()
+    expect(legend?.textContent).toContain('✓')
+    expect(legend?.textContent).toContain('決着済み')
+  })
+
+  it('status も kind も無ければ凡例は出ない(Nano・旧キャッシュ)', () => {
+    const node = renderSummary(twoClusters, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    expect(node.querySelector('.diagram-legend')).toBeNull()
+  })
 })
