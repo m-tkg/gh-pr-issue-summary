@@ -12,6 +12,8 @@ import type {
   FlowStep,
   FlowStepKind,
   Importance,
+  ProblemFactor,
+  ProblemStructure,
 } from './types'
 import { NOTE_SCHEMA, FINAL_SCHEMA, FINAL_SCHEMA_WITH_FLOW } from './schema'
 import {
@@ -226,6 +228,57 @@ function parseFlowSteps(
   return steps.length > 0 ? steps : undefined
 }
 
+const MAX_PROBLEM_FACTORS = 4
+const PROBLEM_LABEL_MAX = 60
+
+/** causes / impacts の 1 配列を防御的に解析する。 */
+function parseProblemFactors(
+  raw: unknown,
+  byOrdinal: Map<number, ClusterComment>,
+): ProblemFactor[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((f: Record<string, unknown>) => ({
+      label:
+        typeof f?.label === 'string'
+          ? f.label.trim().slice(0, PROBLEM_LABEL_MAX)
+          : '',
+      comments: refsToComments(f?.commentRefs, byOrdinal),
+    }))
+    .filter((f) => f.label.length > 0)
+    .slice(0, MAX_PROBLEM_FACTORS)
+}
+
+/**
+ * problemStructure（CLI バックエンド限定・任意項目）を防御的に解析する。
+ * 中心課題が空、または原因・影響・あるべき姿がすべて空なら図にならないため
+ * undefined を返す。Nano の出力にはキー自体が無いため常に通しても影響しない。
+ */
+function parseProblemStructure(
+  raw: unknown,
+  byOrdinal: Map<number, ClusterComment>,
+): ProblemStructure | undefined {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return undefined
+  }
+  const obj = raw as Record<string, unknown>
+  const problem =
+    typeof obj.problem === 'string'
+      ? obj.problem.trim().slice(0, PROBLEM_LABEL_MAX)
+      : ''
+  if (problem.length === 0) return undefined
+  const causes = parseProblemFactors(obj.causes, byOrdinal)
+  const impacts = parseProblemFactors(obj.impacts, byOrdinal)
+  const goal =
+    typeof obj.goal === 'string'
+      ? obj.goal.trim().slice(0, PROBLEM_LABEL_MAX)
+      : ''
+  if (causes.length === 0 && impacts.length === 0 && goal.length === 0) {
+    return undefined
+  }
+  return { problem, causes, impacts, ...(goal ? { goal } : {}) }
+}
+
 async function reduceOnce(
   llm: LlmClient,
   prompt: string,
@@ -277,6 +330,7 @@ export function assembleFinalSummary(
   byOrdinal: Map<number, ClusterComment>,
 ): FinalSummary {
   const flowSteps = parseFlowSteps(obj.flowSteps, byOrdinal)
+  const problemStructure = parseProblemStructure(obj.problemStructure, byOrdinal)
   return {
     overview: String(obj.overview ?? ''),
     parentAndLinks: buildParentAndLinks(page, lang),
@@ -284,6 +338,7 @@ export function assembleFinalSummary(
     currentProgress: String(obj.currentProgress ?? ''),
     clusters: parseClusters(obj, byOrdinal),
     ...(flowSteps ? { flowSteps } : {}),
+    ...(problemStructure ? { problemStructure } : {}),
   }
 }
 

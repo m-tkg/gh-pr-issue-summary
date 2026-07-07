@@ -65,6 +65,20 @@ export const FINAL_SCHEMA: Record<string, unknown> = {
  * 持つスキーマ。大コンテキストの CLI バックエンドの single-shot 要約でのみ使う。
  * Gemini Nano の出力安定性への影響を避けるため FINAL_SCHEMA とは別定数にしている。
  */
+// 課題の原因・影響 1 要素のスキーマ（problemStructure 用）。
+const PROBLEM_FACTORS_SCHEMA: Record<string, unknown> = {
+  type: 'array',
+  items: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['label', 'commentRefs'],
+    properties: {
+      label: { type: 'string' },
+      commentRefs: { type: 'array', items: { type: 'integer' } },
+    },
+  },
+}
+
 export const FINAL_SCHEMA_WITH_FLOW: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
@@ -74,6 +88,17 @@ export const FINAL_SCHEMA_WITH_FLOW: Record<string, unknown> = {
     overallDiscussion: { type: 'string' },
     currentProgress: { type: 'string' },
     clusters: CLUSTERS_SCHEMA_WITH_STATUS,
+    problemStructure: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['problem', 'causes', 'impacts'],
+      properties: {
+        problem: { type: 'string' },
+        causes: PROBLEM_FACTORS_SCHEMA,
+        impacts: PROBLEM_FACTORS_SCHEMA,
+        goal: { type: 'string' },
+      },
+    },
     flowSteps: {
       type: 'array',
       items: {
