@@ -143,6 +143,15 @@ export function singleShotPrompt(
         `    kind: 作業なら "action"、判断・分岐なら "decision"、`,
         `      成果・結論なら "outcome"（迷えば省略可）。`,
         `    commentRefs: その手順の根拠となる [番号] の整数配列。`,
+        `- problemStructure: この issue/PR が解決したい課題の因果構造`,
+        `  （任意、課題が明確に読み取れなければ省略可）。次のキーを持つ。`,
+        `    problem(string, 25 字以内): 中心となる課題。図のノードラベルとして`,
+        `      そのまま表示されるため、具体的な短文にする（例:「CI が 30 分かかる」）。`,
+        `    causes: 課題の原因・背景の配列（0〜4 個）。`,
+        `      各要素は label(25 字以内) / commentRefs([番号] の整数配列)。`,
+        `    impacts: 課題が引き起こす影響・困りごとの配列（0〜4 個）。`,
+        `      各要素は label(25 字以内) / commentRefs。`,
+        `    goal(string, 25 字以内): 解決後のあるべき姿（任意）。`,
       ]
     : []
 
