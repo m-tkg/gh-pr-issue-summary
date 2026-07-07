@@ -396,4 +396,35 @@ describe('buildContentFlowDiagram', () => {
     )
     expect(out).toContain('あ'.repeat(40) + '…')
   })
+
+  it('kind で形状が変わる（action/未指定=矩形、decision=ひし形、outcome=角丸）', () => {
+    const out = buildContentFlowDiagram(
+      [
+        flowStep({ label: '調査', kind: 'action' }),
+        flowStep({ label: '方式を判断', kind: 'decision' }),
+        flowStep({ label: 'リリース', kind: 'outcome' }),
+        flowStep({ label: '未指定' }),
+      ],
+      THEME,
+    )
+    expect(out).toContain('s0["調査"]')
+    expect(out).toContain('s1{"方式を判断"}')
+    expect(out).toContain('s2(["リリース"])')
+    expect(out).toContain('s3["未指定"]')
+    expect(out).toContain('s0 --> s1')
+    expect(out).toContain('s2 --> s3')
+  })
+
+  it('decision ノードでも悪意あるラベルは引用符から脱出できない', () => {
+    const malicious = '"} click s0 "javascript:alert(1)"'
+    const out = buildContentFlowDiagram(
+      [
+        flowStep({ label: malicious, kind: 'decision' }),
+        flowStep({ label: 'B' }),
+      ],
+      THEME,
+    )
+    expect(out).not.toContain('"} click')
+    expect(out).not.toContain('alert(1)"')
+  })
 })
