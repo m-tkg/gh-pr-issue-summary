@@ -123,7 +123,8 @@ export function buildTimelineDiagram(
 
   const lines = ['flowchart LR']
   summary.clusters.forEach((c, i) => {
-    const text = label(c.title) + ordinalRangeSuffix(c.comments)
+    const text =
+      label(c.title) + ordinalRangeSuffix(c.comments) + statusSuffix(c.status)
     lines.push(`c${i}["${text}"]`)
   })
   for (let i = 0; i < summary.clusters.length - 1; i++) {
@@ -131,6 +132,12 @@ export function buildTimelineDiagram(
   }
   lines.push(`classDef step stroke:${theme.medium}`)
   summary.clusters.forEach((_c, i) => lines.push(`class c${i} step`))
+  if (summary.clusters.some((c) => c.status === 'open')) {
+    lines.push(OPEN_CLASS_DEF)
+    summary.clusters.forEach((c, i) => {
+      if (c.status === 'open') lines.push(`class c${i} stOpen`)
+    })
+  }
 
   return lines.join('\n')
 }
