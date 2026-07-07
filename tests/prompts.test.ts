@@ -127,6 +127,21 @@ describe('図解ノードラベルの品質指示', () => {
     expect(p).toMatch(/悪い例[\s\S]*「実装する」/)
     expect(p).toContain('何を')
   })
+
+  it('includeFlowSteps: true のとき kind の指示を含む', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja', {
+      includeFlowSteps: true,
+    })
+    expect(p).toContain('kind')
+    expect(p).toContain('"action"')
+    expect(p).toContain('"decision"')
+    expect(p).toContain('"outcome"')
+  })
+
+  it('省略時は kind の指示を含まない', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja')
+    expect(p).not.toContain('"action"')
+  })
 })
 
 describe('cluster.status の指示 (CLI 限定)', () => {
