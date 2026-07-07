@@ -8,6 +8,7 @@ import {
   buildStructureDiagram,
   buildTimelineDiagram,
   buildContentFlowDiagram,
+  buildProblemDiagram,
   type DiagramTheme,
 } from './diagram'
 
@@ -220,6 +221,14 @@ function renderDiagramSection(
   wrap.append(
     renderDiagramDetails('議論の構造', true, structureSrc, diagram.render),
   )
+  const problemSrc = summary.problemStructure
+    ? buildProblemDiagram(summary.problemStructure, diagram.theme)
+    : null
+  if (problemSrc) {
+    wrap.append(
+      renderDiagramDetails('課題の構造', false, problemSrc, diagram.render),
+    )
+  }
   const timelineSrc = buildTimelineDiagram(summary, diagram.theme)
   if (timelineSrc) {
     wrap.append(
