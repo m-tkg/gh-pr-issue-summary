@@ -305,6 +305,48 @@ describe('buildTimelineDiagram', () => {
     )
     expect(out).not.toContain('"] click')
   })
+
+  it('status: resolved のクラスタは序数レンジの後に ✓ が付く', () => {
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: 'A', status: 'resolved', comments: [comment(1)] }),
+          cluster({ title: 'B', comments: [comment(2)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).toContain('c0["A #1 ✓"]')
+    expect(out).toContain('c1["B #2"]')
+  })
+
+  it('status: open のクラスタは点線クラスが付く', () => {
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: 'A', status: 'open', comments: [comment(1)] }),
+          cluster({ title: 'B', comments: [comment(2)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).toContain('classDef stOpen stroke-dasharray')
+    expect(out).toContain('class c0 stOpen')
+  })
+
+  it('status 無しなら従来出力と完全一致（✓ も stOpen も出ない）', () => {
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: 'A', comments: [comment(1)] }),
+          cluster({ title: 'B', comments: [comment(2)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).not.toContain('✓')
+    expect(out).not.toContain('stOpen')
+  })
 })
 
 describe('buildContentFlowDiagram', () => {
