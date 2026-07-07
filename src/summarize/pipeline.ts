@@ -10,6 +10,7 @@ import type {
   CommentNote,
   FinalSummary,
   FlowStep,
+  FlowStepKind,
   Importance,
 } from './types'
 import { NOTE_SCHEMA, FINAL_SCHEMA, FINAL_SCHEMA_WITH_FLOW } from './schema'
@@ -53,6 +54,15 @@ const VALID_STATUS: ClusterStatus[] = ['resolved', 'open']
 function coerceStatus(v: unknown): ClusterStatus | undefined {
   return VALID_STATUS.includes(v as ClusterStatus)
     ? (v as ClusterStatus)
+    : undefined
+}
+
+const VALID_FLOW_KINDS: FlowStepKind[] = ['action', 'decision', 'outcome']
+
+/** 不正値・欠落は undefined（action と同じ描画）にフォールバックする。 */
+function coerceFlowKind(v: unknown): FlowStepKind | undefined {
+  return VALID_FLOW_KINDS.includes(v as FlowStepKind)
+    ? (v as FlowStepKind)
     : undefined
 }
 
@@ -198,13 +208,17 @@ function parseFlowSteps(
   if (!Array.isArray(raw)) return undefined
   const steps = raw
     .slice(0, MAX_FLOW_STEPS)
-    .map((s: Record<string, unknown>) => ({
-      label:
-        typeof s?.label === 'string'
-          ? s.label.trim().slice(0, FLOW_STEP_LABEL_MAX)
-          : '',
-      comments: refsToComments(s?.commentRefs, byOrdinal),
-    }))
+    .map((s: Record<string, unknown>) => {
+      const kind = coerceFlowKind(s?.kind)
+      return {
+        label:
+          typeof s?.label === 'string'
+            ? s.label.trim().slice(0, FLOW_STEP_LABEL_MAX)
+            : '',
+        ...(kind ? { kind } : {}),
+        comments: refsToComments(s?.commentRefs, byOrdinal),
+      }
+    })
     .filter((s) => s.label.length > 0)
   return steps.length > 0 ? steps : undefined
 }

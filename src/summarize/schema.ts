@@ -82,6 +82,7 @@ export const FINAL_SCHEMA_WITH_FLOW: Record<string, unknown> = {
         required: ['label', 'commentRefs'],
         properties: {
           label: { type: 'string' },
+          kind: { type: 'string', enum: ['action', 'decision', 'outcome'] },
           commentRefs: { type: 'array', items: { type: 'integer' } },
         },
       },

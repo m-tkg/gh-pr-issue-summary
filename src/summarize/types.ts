@@ -50,9 +50,14 @@ export interface Cluster {
   comments: ClusterComment[]
 }
 
+/** 手順の種別（CLI バックエンド限定の任意項目）。図のノード形状に対応する。 */
+export type FlowStepKind = 'action' | 'decision' | 'outcome'
+
 /** やろうとしている作業・提案内容の 1 手順（CLI バックエンド限定の任意項目）。 */
 export interface FlowStep {
   label: string
+  /** 作業 / 判断・分岐 / 成果・結論。欠落時は作業(action)と同じ描画。 */
+  kind?: FlowStepKind
   comments: ClusterComment[]
 }
 
