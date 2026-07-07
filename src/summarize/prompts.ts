@@ -165,12 +165,19 @@ export function singleShotPrompt(
     `- currentProgress: 現状の進捗・結論の状態。これも最初の一文で状態を言い切ること。`,
     `- clusters: 議論のかたまりの配列。各要素は`,
     `    title(string) / summary(string) / importance("high"|"medium"|"low") /`,
+    ...(opts.includeFlowSteps ? [`    status("resolved"|"open") /`] : []),
     `    commentRefs(その論点に関係するコメントの [番号] の整数配列)`,
     `  title は図のノードラベルとしてそのまま表示される。25 字以内で、`,
     `  「何が」「どうなったか」が分かる具体的な短文にすること。`,
     `  関数名・API 名・設定名などの固有名詞があれば優先して含める。`,
     `  悪い例:「実装方針について」「エラーハンドリング」`,
     `  良い例:「retry 上限は 3 回に決定」「iframe 案は CSP 違反で却下」`,
+    ...(opts.includeFlowSteps
+      ? [
+          `  status はその論点が決着済みなら "resolved"、未決なら "open"。`,
+          `  判断できなければ省略してよい。`,
+        ]
+      : []),
     `複数の論点があればまとまりごとに cluster を分けること。`,
     ...flowStepsInstruction,
   ].join('\n')
