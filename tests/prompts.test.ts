@@ -128,3 +128,19 @@ describe('図解ノードラベルの品質指示', () => {
     expect(p).toContain('何を')
   })
 })
+
+describe('cluster.status の指示 (CLI 限定)', () => {
+  it('includeFlowSteps: true のとき status の指示を含む', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja', {
+      includeFlowSteps: true,
+    })
+    expect(p).toContain('status')
+    expect(p).toContain('"resolved"')
+    expect(p).toContain('"open"')
+  })
+
+  it('省略時は status の指示を含まない（Nano スキーマと整合）', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja')
+    expect(p).not.toContain('status')
+  })
+})
