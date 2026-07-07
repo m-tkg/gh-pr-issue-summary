@@ -340,6 +340,88 @@ describe('assembleFinalSummary の flowSteps 解析 (optional, CLI 限定)', () 
   })
 })
 
+describe('cluster.status の防御的パース (optional, CLI 限定)', () => {
+  function byOrdinal(...ordinals: number[]): Map<number, ClusterComment> {
+    return new Map(
+      ordinals.map((o) => [
+        o,
+        { url: `/r/r/issues/1#issuecomment-${o}`, ordinal: o, author: 'a' },
+      ]),
+    )
+  }
+  const base = {
+    overview: 'ov',
+    overallDiscussion: 'od',
+    currentProgress: 'cp',
+  }
+  function clusterWith(status?: unknown) {
+    return {
+      title: 't',
+      summary: 's',
+      importance: 'high',
+      commentRefs: [1],
+      ...(status !== undefined ? { status } : {}),
+    }
+  }
+
+  it('"resolved" / "open" は採用される', () => {
+    const summary = assembleFinalSummary(
+      { ...base, clusters: [clusterWith('resolved'), clusterWith('open')] },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.clusters[0].status).toBe('resolved')
+    expect(summary.clusters[1].status).toBe('open')
+  })
+
+  it('不正値は undefined にフォールバック', () => {
+    const summary = assembleFinalSummary(
+      { ...base, clusters: [clusterWith('done')] },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.clusters[0].status).toBeUndefined()
+  })
+
+  it('キー無し（Nano 出力・旧キャッシュ）は undefined のまま', () => {
+    const summary = assembleFinalSummary(
+      { ...base, clusters: [clusterWith()] },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.clusters[0].status).toBeUndefined()
+  })
+})
+
+describe('スキーマの status フィールド (Nano 安定性の保護)', () => {
+  function clusterItems(schema: Record<string, unknown>): {
+    required: string[]
+    properties: Record<string, unknown>
+  } {
+    const props = schema.properties as Record<string, { items: unknown }>
+    return props.clusters.items as {
+      required: string[]
+      properties: Record<string, unknown>
+    }
+  }
+
+  it('FINAL_SCHEMA (Nano 用) の clusters に status は無い', () => {
+    expect(clusterItems(FINAL_SCHEMA).properties).not.toHaveProperty('status')
+  })
+
+  it('FINAL_SCHEMA_WITH_FLOW の clusters に status enum があり required ではない', () => {
+    const items = clusterItems(FINAL_SCHEMA_WITH_FLOW)
+    expect(items.properties.status).toEqual({
+      type: 'string',
+      enum: ['resolved', 'open'],
+    })
+    expect(items.required).not.toContain('status')
+  })
+})
+
 describe('buildParentAndLinks', () => {
   it('関連が無ければその旨を返す', () => {
     expect(buildParentAndLinks(page, 'ja')).toContain('見つかりません')
