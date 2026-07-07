@@ -1,4 +1,8 @@
-import type { FinalSummary, FlowStep } from '../summarize/types'
+import type {
+  FinalSummary,
+  FlowStep,
+  ProblemStructure,
+} from '../summarize/types'
 
 // FinalSummary から mermaid ソースを決定的に組み立てる純粋関数群。
 // LLM には mermaid コードを直接書かせない（構文エラーを原理的に排除するため）。
@@ -51,6 +55,17 @@ function classDefBlock(theme: DiagramTheme): string {
   ].join('\n')
 }
 
+/**
+ * 決着済み(resolved)ノードのラベルに付ける決定的サフィックス。
+ * escapeLabel 済みラベルの後にコード側で付与するため注入経路にならない。
+ */
+function statusSuffix(status: 'resolved' | 'open' | undefined): string {
+  return status === 'resolved' ? ' ✓' : ''
+}
+
+/** 未決(open)ノード用の点線スタイル。重要度の色クラスと直交して共存できる。 */
+const OPEN_CLASS_DEF = 'classDef stOpen stroke-dasharray:4 3'
+
 /** 議論の構造図（概要 → 各クラスタ(重要度付き) → 現状の進捗）を組み立てる。 */
 export function buildStructureDiagram(
   summary: FinalSummary,
@@ -68,7 +83,7 @@ export function buildStructureDiagram(
   } else {
     clusters.forEach((c, i) => {
       const id = `c${i}`
-      lines.push(`${id}["${label(c.title)}"]`)
+      lines.push(`${id}["${label(c.title)}${statusSuffix(c.status)}"]`)
       lines.push(`ov --> ${id}`)
       lines.push(`${id} --> pg`)
     })
@@ -83,6 +98,12 @@ export function buildStructureDiagram(
   clusters.forEach((c, i) => {
     lines.push(`class c${i} ${c.importance}`)
   })
+  if (clusters.some((c) => c.status === 'open')) {
+    lines.push(OPEN_CLASS_DEF)
+    clusters.forEach((c, i) => {
+      if (c.status === 'open') lines.push(`class c${i} stOpen`)
+    })
+  }
 
   return lines.join('\n')
 }
@@ -106,7 +127,8 @@ export function buildTimelineDiagram(
 
   const lines = ['flowchart LR']
   summary.clusters.forEach((c, i) => {
-    const text = label(c.title) + ordinalRangeSuffix(c.comments)
+    const text =
+      label(c.title) + ordinalRangeSuffix(c.comments) + statusSuffix(c.status)
     lines.push(`c${i}["${text}"]`)
   })
   for (let i = 0; i < summary.clusters.length - 1; i++) {
@@ -114,6 +136,12 @@ export function buildTimelineDiagram(
   }
   lines.push(`classDef step stroke:${theme.medium}`)
   summary.clusters.forEach((_c, i) => lines.push(`class c${i} step`))
+  if (summary.clusters.some((c) => c.status === 'open')) {
+    lines.push(OPEN_CLASS_DEF)
+    summary.clusters.forEach((c, i) => {
+      if (c.status === 'open') lines.push(`class c${i} stOpen`)
+    })
+  }
 
   return lines.join('\n')
 }
@@ -130,13 +158,64 @@ export function buildContentFlowDiagram(
 
   const lines = ['flowchart LR']
   steps.forEach((s, i) => {
-    lines.push(`s${i}["${label(s.label)}"]`)
+    const text = label(s.label)
+    // kind に応じたノード形状。ラベルは常にエスケープ済みで引用符内。
+    if (s.kind === 'decision') {
+      lines.push(`s${i}{"${text}"}`)
+    } else if (s.kind === 'outcome') {
+      lines.push(`s${i}(["${text}"])`)
+    } else {
+      lines.push(`s${i}["${text}"]`)
+    }
   })
   for (let i = 0; i < steps.length - 1; i++) {
     lines.push(`s${i} --> s${i + 1}`)
   }
   lines.push(`classDef step stroke:${theme.medium}`)
   steps.forEach((_s, i) => lines.push(`class s${i} step`))
+
+  return lines.join('\n')
+}
+
+/**
+ * 解決したい課題の因果構造（CLI バックエンド限定・任意）を
+ * 原因群 → 中心課題 → 影響群 ＋ あるべき姿(点線・角丸) として組み立てる。
+ * 中心課題しか無い場合は図にならないため null を返す。
+ */
+export function buildProblemDiagram(
+  ps: ProblemStructure,
+  theme: DiagramTheme,
+): string | null {
+  const hasGoal = Boolean(ps.goal)
+  if (
+    ps.problem.length === 0 ||
+    (ps.causes.length === 0 && ps.impacts.length === 0 && !hasGoal)
+  ) {
+    return null
+  }
+
+  const lines = ['flowchart LR']
+  lines.push(`pb["${label(ps.problem)}"]`)
+  ps.causes.forEach((c, i) => {
+    lines.push(`ca${i}["${label(c.label)}"]`)
+    lines.push(`ca${i} --> pb`)
+  })
+  ps.impacts.forEach((im, i) => {
+    lines.push(`im${i}["${label(im.label)}"]`)
+    lines.push(`pb --> im${i}`)
+  })
+  if (hasGoal) {
+    lines.push(`gl(["${label(ps.goal ?? '')}"])`)
+    lines.push('pb -.-> gl')
+  }
+
+  lines.push(`classDef problem stroke:${theme.high},stroke-width:3px`)
+  lines.push(`classDef factor stroke:${theme.medium}`)
+  lines.push(`classDef goal stroke:${theme.low}`)
+  lines.push('class pb problem')
+  ps.causes.forEach((_c, i) => lines.push(`class ca${i} factor`))
+  ps.impacts.forEach((_im, i) => lines.push(`class im${i} factor`))
+  if (hasGoal) lines.push('class gl goal')
 
   return lines.join('\n')
 }

@@ -395,7 +395,7 @@ async function onSummarize() {
       ;({ summary } = await summarizeSingleShot(llm, pageData, targetComments, {
         lang,
         onProgress: () => {},
-        includeFlowSteps: true,
+        includeExtendedFields: true,
       }))
     } else {
       ;({ summary } = await summarize(llm, pageData, targetComments, 1, {

@@ -36,19 +36,50 @@ export interface ClusterComment {
   timestampISO?: string
 }
 
+/** 論点の決着状況（CLI バックエンド限定の任意項目）。 */
+export type ClusterStatus = 'resolved' | 'open'
+
 /** 議論のかたまり。 */
 export interface Cluster {
   title: string
   summary: string
   importance: Importance
+  /** 決着済みか未決か（CLI バックエンドのみ生成、Nano では常に undefined）。 */
+  status?: ClusterStatus
   /** 該当コメント一覧（序数・投稿者・日時付き）。 */
   comments: ClusterComment[]
 }
 
+/** 手順の種別（CLI バックエンド限定の任意項目）。図のノード形状に対応する。 */
+export type FlowStepKind = 'action' | 'decision' | 'outcome'
+
 /** やろうとしている作業・提案内容の 1 手順（CLI バックエンド限定の任意項目）。 */
 export interface FlowStep {
   label: string
+  /** 作業 / 判断・分岐 / 成果・結論。欠落時は作業(action)と同じ描画。 */
+  kind?: FlowStepKind
   comments: ClusterComment[]
+}
+
+/** 課題の原因・影響の 1 要素（CLI バックエンド限定の任意項目）。 */
+export interface ProblemFactor {
+  label: string
+  comments: ClusterComment[]
+}
+
+/**
+ * 解決したい課題の因果構造（CLI バックエンド限定の任意項目）。
+ * 原因群 → 中心課題 → 影響群 ＋ あるべき姿、として図式化する。
+ */
+export interface ProblemStructure {
+  /** 中心となる課題。 */
+  problem: string
+  /** 課題の原因・背景。 */
+  causes: ProblemFactor[]
+  /** 課題による影響・困りごと。 */
+  impacts: ProblemFactor[]
+  /** 解決後のあるべき姿（任意）。 */
+  goal?: string
 }
 
 /** 最終要約結果。 */
@@ -65,4 +96,6 @@ export interface FinalSummary {
   clusters: Cluster[]
   /** 作業・提案内容の流れ（CLI バックエンドのみ生成、Nano では常に undefined）。 */
   flowSteps?: FlowStep[]
+  /** 解決したい課題の構造（CLI バックエンドのみ生成、Nano では常に undefined）。 */
+  problemStructure?: ProblemStructure
 }

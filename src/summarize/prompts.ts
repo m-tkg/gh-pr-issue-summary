@@ -89,6 +89,9 @@ export function reducePrompt(
     `- currentProgress: 現状の進捗・結論の状態`,
     `- clusters: 議論のかたまり（複数の論点があればまとまりごとに分割）。`,
     `  各 cluster は title / summary / importance / commentRefs を持つ。`,
+    `  title は図のノードラベルとしてそのまま表示される。25 字以内で`,
+    `  「何が」「どうなったか」が分かる具体的な短文にする`,
+    `  （例:「retry 上限は 3 回に決定」。「実装方針について」のような抽象語は避ける）。`,
     `  commentRefs には、その論点に関係するコメントの [番号] を整数配列で列挙する。`,
     `  importance は high / medium / low で各 cluster の重要度を示す。`,
     '',
@@ -101,8 +104,11 @@ export function reducePrompt(
 export const SINGLESHOT_PER_COMMENT_TOKEN_BUDGET = 1500
 
 export interface SingleShotPromptOptions {
-  /** 作業・提案内容の flowSteps を生成させるか（CLI バックエンド限定）。 */
-  includeFlowSteps?: boolean
+  /**
+   * CLI バックエンド限定の拡張フィールド一式（flowSteps / cluster.status /
+   * flowStep.kind）の生成指示を含めるか。
+   */
+  includeExtendedFields?: boolean
 }
 
 export function singleShotPrompt(
@@ -122,10 +128,30 @@ export function singleShotPrompt(
     })
     .join('\n\n')
 
-  const flowStepsInstruction = opts.includeFlowSteps
+  // 字数指示の 3 層構造: プロンプト指示（title 25 字 / label 30 字）
+  //   < 図の切り詰め 40 字（diagram.ts truncateLabel）
+  //   < パーサ上限 60 字（pipeline.ts FLOW_STEP_LABEL_MAX、防御バッファ）。
+  const flowStepsInstruction = opts.includeExtendedFields
     ? [
-        `- flowSteps: やろうとしている作業・提案内容を 3〜7 個の短い手順に分けた配列（任意、無ければ省略可）。`,
-        `    各要素は label(string, 30 字以内) / commentRefs(その手順の根拠となる [番号] の整数配列) を持つ。`,
+        `- flowSteps: この PR/issue で実現しようとしている変更・提案の流れを、`,
+        `  読者が図だけで全体像を掴めるように 3〜7 個の手順に分けた配列（任意、無ければ省略可）。`,
+        `  各要素は label / kind / commentRefs を持つ。`,
+        `    label(string, 30 字以内): 図のノードラベルとしてそのまま表示される。`,
+        `      「何を」「どうする」を必ず含め、関数名・API 名などの固有名詞を優先して使う。`,
+        `      悪い例:「実装する」「テストを書く」「修正」`,
+        `      良い例:「parseFlowSteps に enum 検証を追加」「fallback を旧 API に切替」`,
+        `    kind: 作業なら "action"、判断・分岐なら "decision"、`,
+        `      成果・結論なら "outcome"（迷えば省略可）。`,
+        `    commentRefs: その手順の根拠となる [番号] の整数配列。`,
+        `- problemStructure: この issue/PR が解決したい課題の因果構造`,
+        `  （任意、課題が明確に読み取れなければ省略可）。次のキーを持つ。`,
+        `    problem(string, 25 字以内): 中心となる課題。図のノードラベルとして`,
+        `      そのまま表示されるため、具体的な短文にする（例:「CI が 30 分かかる」）。`,
+        `    causes: 課題の原因・背景の配列（0〜4 個）。`,
+        `      各要素は label(25 字以内) / commentRefs([番号] の整数配列)。`,
+        `    impacts: 課題が引き起こす影響・困りごとの配列（0〜4 個）。`,
+        `      各要素は label(25 字以内) / commentRefs。`,
+        `    goal(string, 25 字以内): 解決後のあるべき姿（任意）。`,
       ]
     : []
 
@@ -147,12 +173,25 @@ export function singleShotPrompt(
     `${langName(lang)} で、次の項目を持つ JSON オブジェクトを**1つだけ**出力してください。`,
     `出力は必ず文字 { で始め、文字 } で終えること。`,
     `前後に説明文・前置き・後書き・コードフェンス（\`\`\`）を一切付けないこと。`,
-    `- overview: どのような issue/PR か（本文の主旨）`,
+    `- overview: どのような issue/PR か（本文の主旨）。最初の一文で結論を言い切ること`,
+    `  （図では先頭部分のみ表示されるため）。`,
     `- overallDiscussion: 全体を通した議論の流れ（重要点は厚く、些末は薄く）`,
-    `- currentProgress: 現状の進捗・結論の状態`,
+    `- currentProgress: 現状の進捗・結論の状態。これも最初の一文で状態を言い切ること。`,
     `- clusters: 議論のかたまりの配列。各要素は`,
     `    title(string) / summary(string) / importance("high"|"medium"|"low") /`,
+    ...(opts.includeExtendedFields ? [`    status("resolved"|"open") /`] : []),
     `    commentRefs(その論点に関係するコメントの [番号] の整数配列)`,
+    `  title は図のノードラベルとしてそのまま表示される。25 字以内で、`,
+    `  「何が」「どうなったか」が分かる具体的な短文にすること。`,
+    `  関数名・API 名・設定名などの固有名詞があれば優先して含める。`,
+    `  悪い例:「実装方針について」「エラーハンドリング」`,
+    `  良い例:「retry 上限は 3 回に決定」「iframe 案は CSP 違反で却下」`,
+    ...(opts.includeExtendedFields
+      ? [
+          `  status はその論点が決着済みなら "resolved"、未決なら "open"。`,
+          `  判断できなければ省略してよい。`,
+        ]
+      : []),
     `複数の論点があればまとまりごとに cluster を分けること。`,
     ...flowStepsInstruction,
   ].join('\n')

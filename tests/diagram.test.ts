@@ -5,6 +5,7 @@ import {
   buildStructureDiagram,
   buildTimelineDiagram,
   buildContentFlowDiagram,
+  buildProblemDiagram,
   type DiagramTheme,
 } from '../src/sidepanel/diagram'
 import type {
@@ -12,6 +13,7 @@ import type {
   ClusterComment,
   FinalSummary,
   FlowStep,
+  ProblemStructure,
 } from '../src/summarize/types'
 
 const THEME: DiagramTheme = {
@@ -191,6 +193,35 @@ describe('buildStructureDiagram', () => {
     expect(out).toContain('ov --> cmore')
     expect(out).toContain('cmore --> pg')
   })
+
+  it('status: resolved のクラスタはラベル末尾に ✓ が付く', () => {
+    const out = buildStructureDiagram(
+      summary({ clusters: [cluster({ title: 'A論点', status: 'resolved' })] }),
+      THEME,
+    )
+    expect(out).toContain('c0["A論点 ✓"]')
+  })
+
+  it('status: open のクラスタは点線クラスが付き、重要度クラスと共存する', () => {
+    const out = buildStructureDiagram(
+      summary({
+        clusters: [cluster({ title: 'A論点', importance: 'high', status: 'open' })],
+      }),
+      THEME,
+    )
+    expect(out).toContain('classDef stOpen stroke-dasharray')
+    expect(out).toContain('class c0 stOpen')
+    expect(out).toContain('class c0 high')
+  })
+
+  it('status 無しのクラスタのみなら従来出力と完全一致（✓ も stOpen も出ない）', () => {
+    const out = buildStructureDiagram(
+      summary({ clusters: [cluster({ title: 'A論点' })] }),
+      THEME,
+    )
+    expect(out).not.toContain('✓')
+    expect(out).not.toContain('stOpen')
+  })
 })
 
 describe('buildTimelineDiagram', () => {
@@ -276,6 +307,48 @@ describe('buildTimelineDiagram', () => {
     )
     expect(out).not.toContain('"] click')
   })
+
+  it('status: resolved のクラスタは序数レンジの後に ✓ が付く', () => {
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: 'A', status: 'resolved', comments: [comment(1)] }),
+          cluster({ title: 'B', comments: [comment(2)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).toContain('c0["A #1 ✓"]')
+    expect(out).toContain('c1["B #2"]')
+  })
+
+  it('status: open のクラスタは点線クラスが付く', () => {
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: 'A', status: 'open', comments: [comment(1)] }),
+          cluster({ title: 'B', comments: [comment(2)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).toContain('classDef stOpen stroke-dasharray')
+    expect(out).toContain('class c0 stOpen')
+  })
+
+  it('status 無しなら従来出力と完全一致（✓ も stOpen も出ない）', () => {
+    const out = buildTimelineDiagram(
+      summary({
+        clusters: [
+          cluster({ title: 'A', comments: [comment(1)] }),
+          cluster({ title: 'B', comments: [comment(2)] }),
+        ],
+      }),
+      THEME,
+    )
+    expect(out).not.toContain('✓')
+    expect(out).not.toContain('stOpen')
+  })
 })
 
 describe('buildContentFlowDiagram', () => {
@@ -321,6 +394,123 @@ describe('buildContentFlowDiagram', () => {
     const long = 'あ'.repeat(50)
     const out = buildContentFlowDiagram(
       [flowStep({ label: long }), flowStep({ label: 'B' })],
+      THEME,
+    )
+    expect(out).toContain('あ'.repeat(40) + '…')
+  })
+
+  it('kind で形状が変わる（action/未指定=矩形、decision=ひし形、outcome=角丸）', () => {
+    const out = buildContentFlowDiagram(
+      [
+        flowStep({ label: '調査', kind: 'action' }),
+        flowStep({ label: '方式を判断', kind: 'decision' }),
+        flowStep({ label: 'リリース', kind: 'outcome' }),
+        flowStep({ label: '未指定' }),
+      ],
+      THEME,
+    )
+    expect(out).toContain('s0["調査"]')
+    expect(out).toContain('s1{"方式を判断"}')
+    expect(out).toContain('s2(["リリース"])')
+    expect(out).toContain('s3["未指定"]')
+    expect(out).toContain('s0 --> s1')
+    expect(out).toContain('s2 --> s3')
+  })
+
+  it('decision ノードでも悪意あるラベルは引用符から脱出できない', () => {
+    const malicious = '"} click s0 "javascript:alert(1)"'
+    const out = buildContentFlowDiagram(
+      [
+        flowStep({ label: malicious, kind: 'decision' }),
+        flowStep({ label: 'B' }),
+      ],
+      THEME,
+    )
+    expect(out).not.toContain('"} click')
+    expect(out).not.toContain('alert(1)"')
+  })
+})
+
+describe('buildProblemDiagram', () => {
+  function problem(overrides: Partial<ProblemStructure> = {}): ProblemStructure {
+    return {
+      problem: '中心課題',
+      causes: [],
+      impacts: [],
+      ...overrides,
+    }
+  }
+
+  it('原因・影響・あるべき姿がすべて無ければ null を返す', () => {
+    expect(buildProblemDiagram(problem(), THEME)).toBeNull()
+  })
+
+  it('flowchart LR で、原因 → 課題 → 影響 とあるべき姿(点線・角丸)を組み立てる', () => {
+    const out = buildProblemDiagram(
+      problem({
+        causes: [
+          { label: '依存が多い', comments: [] },
+          { label: 'キャッシュ無効', comments: [] },
+        ],
+        impacts: [{ label: 'CI が 30 分かかる', comments: [] }],
+        goal: 'CI を 10 分以内に',
+      }),
+      THEME,
+    )
+    expect(out).not.toBeNull()
+    expect((out as string).startsWith('flowchart LR')).toBe(true)
+    expect(out).toContain('pb["中心課題"]')
+    expect(out).toContain('ca0["依存が多い"]')
+    expect(out).toContain('ca1["キャッシュ無効"]')
+    expect(out).toContain('ca0 --> pb')
+    expect(out).toContain('ca1 --> pb')
+    expect(out).toContain('im0["CI が 30 分かかる"]')
+    expect(out).toContain('pb --> im0')
+    expect(out).toContain('gl(["CI を 10 分以内に"])')
+    expect(out).toContain('pb -.-> gl')
+  })
+
+  it('goal が無ければ gl ノードが出ない', () => {
+    const out = buildProblemDiagram(
+      problem({ causes: [{ label: 'X', comments: [] }] }),
+      THEME,
+    )
+    expect(out).not.toContain('gl')
+  })
+
+  it('課題ノードは強調クラス、原因・影響・goal にもクラスが付く', () => {
+    const out = buildProblemDiagram(
+      problem({
+        causes: [{ label: 'X', comments: [] }],
+        impacts: [{ label: 'Y', comments: [] }],
+        goal: 'Z',
+      }),
+      THEME,
+    )
+    expect(out).toContain('class pb problem')
+    expect(out).toContain('class ca0 factor')
+    expect(out).toContain('class im0 factor')
+    expect(out).toContain('class gl goal')
+    expect(out).toContain(THEME.high)
+  })
+
+  it('悪意あるラベルはエスケープされ、生の " が残らない', () => {
+    const malicious = '"] click pb "javascript:alert(1)"'
+    const out = buildProblemDiagram(
+      problem({
+        problem: malicious,
+        causes: [{ label: malicious, comments: [] }],
+        goal: malicious,
+      }),
+      THEME,
+    )
+    expect(out).not.toContain('"] click')
+  })
+
+  it('長いラベルは 40 字に省略される', () => {
+    const long = 'あ'.repeat(50)
+    const out = buildProblemDiagram(
+      problem({ problem: long, causes: [{ label: 'X', comments: [] }] }),
       THEME,
     )
     expect(out).toContain('あ'.repeat(40) + '…')

@@ -338,6 +338,261 @@ describe('assembleFinalSummary の flowSteps 解析 (optional, CLI 限定)', () 
     )
     expect(summary.flowSteps?.[0].comments).toEqual([])
   })
+
+  it('kind(action/decision/outcome) は採用され、不正値・欠落は undefined', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...baseObj,
+        flowSteps: [
+          { label: 'A', kind: 'action', commentRefs: [] },
+          { label: 'B', kind: 'decision', commentRefs: [] },
+          { label: 'C', kind: 'outcome', commentRefs: [] },
+          { label: 'D', kind: 'unknown', commentRefs: [] },
+          { label: 'E', commentRefs: [] },
+        ],
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.flowSteps?.map((s) => s.kind)).toEqual([
+      'action',
+      'decision',
+      'outcome',
+      undefined,
+      undefined,
+    ])
+  })
+})
+
+describe('cluster.status の防御的パース (optional, CLI 限定)', () => {
+  function byOrdinal(...ordinals: number[]): Map<number, ClusterComment> {
+    return new Map(
+      ordinals.map((o) => [
+        o,
+        { url: `/r/r/issues/1#issuecomment-${o}`, ordinal: o, author: 'a' },
+      ]),
+    )
+  }
+  const base = {
+    overview: 'ov',
+    overallDiscussion: 'od',
+    currentProgress: 'cp',
+  }
+  function clusterWith(status?: unknown) {
+    return {
+      title: 't',
+      summary: 's',
+      importance: 'high',
+      commentRefs: [1],
+      ...(status !== undefined ? { status } : {}),
+    }
+  }
+
+  it('"resolved" / "open" は採用される', () => {
+    const summary = assembleFinalSummary(
+      { ...base, clusters: [clusterWith('resolved'), clusterWith('open')] },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.clusters[0].status).toBe('resolved')
+    expect(summary.clusters[1].status).toBe('open')
+  })
+
+  it('不正値は undefined にフォールバック', () => {
+    const summary = assembleFinalSummary(
+      { ...base, clusters: [clusterWith('done')] },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.clusters[0].status).toBeUndefined()
+  })
+
+  it('キー無し（Nano 出力・旧キャッシュ）は undefined のまま', () => {
+    const summary = assembleFinalSummary(
+      { ...base, clusters: [clusterWith()] },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.clusters[0].status).toBeUndefined()
+  })
+})
+
+describe('assembleFinalSummary の problemStructure 解析 (optional, CLI 限定)', () => {
+  function byOrdinal(...ordinals: number[]): Map<number, ClusterComment> {
+    return new Map(
+      ordinals.map((o) => [
+        o,
+        { url: `/r/r/issues/1#issuecomment-${o}`, ordinal: o, author: 'a' },
+      ]),
+    )
+  }
+  const base = {
+    overview: 'ov',
+    overallDiscussion: 'od',
+    currentProgress: 'cp',
+    clusters: [],
+  }
+
+  it('無ければ undefined', () => {
+    const summary = assembleFinalSummary(base, page, 'ja', byOrdinal(1))
+    expect(summary.problemStructure).toBeUndefined()
+  })
+
+  it('オブジェクトでなければ undefined', () => {
+    const summary = assembleFinalSummary(
+      { ...base, problemStructure: '不正' },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.problemStructure).toBeUndefined()
+  })
+
+  it('正常系: problem/causes/impacts/goal を解決する', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        problemStructure: {
+          problem: 'ビルドが遅い',
+          causes: [{ label: '依存が多い', commentRefs: [1] }],
+          impacts: [{ label: 'CI が 30 分かかる', commentRefs: [2] }],
+          goal: 'CI を 10 分以内にする',
+        },
+      },
+      page,
+      'ja',
+      byOrdinal(1, 2),
+    )
+    const ps = summary.problemStructure
+    expect(ps?.problem).toBe('ビルドが遅い')
+    expect(ps?.causes[0].label).toBe('依存が多い')
+    expect(ps?.causes[0].comments.map((c) => c.ordinal)).toEqual([1])
+    expect(ps?.impacts[0].label).toBe('CI が 30 分かかる')
+    expect(ps?.goal).toBe('CI を 10 分以内にする')
+  })
+
+  it('problem が空なら undefined', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        problemStructure: {
+          problem: ' ',
+          causes: [{ label: 'x', commentRefs: [] }],
+          impacts: [],
+        },
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.problemStructure).toBeUndefined()
+  })
+
+  it('causes/impacts/goal がすべて空なら undefined（図にならない）', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        problemStructure: { problem: 'P', causes: [], impacts: [] },
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.problemStructure).toBeUndefined()
+  })
+
+  it('goal だけあれば成立する（problem → goal の 2 ノード）', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        problemStructure: { problem: 'P', causes: [], impacts: [], goal: 'G' },
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.problemStructure?.goal).toBe('G')
+  })
+
+  it('causes は 4 件に足切りされ、空ラベルは除外される', () => {
+    const causes = Array.from({ length: 6 }, (_, i) => ({
+      label: `原因${i}`,
+      commentRefs: [],
+    }))
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        problemStructure: {
+          problem: 'P',
+          causes: [{ label: ' ', commentRefs: [] }, ...causes],
+          impacts: [],
+        },
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.problemStructure?.causes.map((c) => c.label)).toEqual([
+      '原因0',
+      '原因1',
+      '原因2',
+      '原因3',
+    ])
+  })
+})
+
+describe('スキーマの status フィールド (Nano 安定性の保護)', () => {
+  function clusterItems(schema: Record<string, unknown>): {
+    required: string[]
+    properties: Record<string, unknown>
+  } {
+    const props = schema.properties as Record<string, { items: unknown }>
+    return props.clusters.items as {
+      required: string[]
+      properties: Record<string, unknown>
+    }
+  }
+
+  it('FINAL_SCHEMA (Nano 用) の clusters に status は無い', () => {
+    expect(clusterItems(FINAL_SCHEMA).properties).not.toHaveProperty('status')
+  })
+
+  it('FINAL_SCHEMA_WITH_FLOW の clusters に status enum があり required ではない', () => {
+    const items = clusterItems(FINAL_SCHEMA_WITH_FLOW)
+    expect(items.properties.status).toEqual({
+      type: 'string',
+      enum: ['resolved', 'open'],
+    })
+    expect(items.required).not.toContain('status')
+  })
+
+  it('FINAL_SCHEMA に problemStructure は無く、WITH_FLOW にはあり required ではない', () => {
+    const props = FINAL_SCHEMA.properties as Record<string, unknown>
+    expect(props).not.toHaveProperty('problemStructure')
+    const flowProps = FINAL_SCHEMA_WITH_FLOW.properties as Record<
+      string,
+      unknown
+    >
+    expect(flowProps).toHaveProperty('problemStructure')
+    expect(FINAL_SCHEMA_WITH_FLOW.required).not.toContain('problemStructure')
+  })
+
+  it('FINAL_SCHEMA_WITH_FLOW の flowSteps に kind enum があり required ではない', () => {
+    const props = FINAL_SCHEMA_WITH_FLOW.properties as Record<
+      string,
+      { items: { required: string[]; properties: Record<string, unknown> } }
+    >
+    const items = props.flowSteps.items
+    expect(items.properties.kind).toEqual({
+      type: 'string',
+      enum: ['action', 'decision', 'outcome'],
+    })
+    expect(items.required).not.toContain('kind')
+  })
 })
 
 describe('buildParentAndLinks', () => {
@@ -409,7 +664,7 @@ describe('summarizeSingleShot (大コンテキスト/CLI 向け 1 回要約)', (
     ])
   })
 
-  it('includeFlowSteps: true のとき FINAL_SCHEMA_WITH_FLOW を使い、プロンプトに flowSteps 指示を含む', async () => {
+  it('includeExtendedFields: true のとき FINAL_SCHEMA_WITH_FLOW を使い、プロンプトに flowSteps 指示を含む', async () => {
     const llm = new MockLlmClient(() =>
       JSON.stringify({
         overview: '概要',
@@ -422,7 +677,7 @@ describe('summarizeSingleShot (大コンテキスト/CLI 向け 1 回要約)', (
     const comments = [comment(11, 'a')]
     const { summary } = await summarizeSingleShot(llm, page, comments, {
       lang: 'ja',
-      includeFlowSteps: true,
+      includeExtendedFields: true,
     })
     expect(llm.prompts[0]).toContain('flowSteps')
     expect(llm.promptOptions[0]?.responseConstraint).toBe(
@@ -431,7 +686,7 @@ describe('summarizeSingleShot (大コンテキスト/CLI 向け 1 回要約)', (
     expect(summary.flowSteps?.[0].label).toBe('調査する')
   })
 
-  it('includeFlowSteps 省略時は FINAL_SCHEMA を使い、プロンプトに flowSteps 指示を含まない', async () => {
+  it('includeExtendedFields 省略時は FINAL_SCHEMA を使い、プロンプトに flowSteps 指示を含まない', async () => {
     const llm = new MockLlmClient(() =>
       JSON.stringify({
         overview: '概要',

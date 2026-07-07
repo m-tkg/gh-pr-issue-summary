@@ -5,11 +5,15 @@ import type { LlmClient } from './llmClient'
 import type {
   Cluster,
   ClusterComment,
+  ClusterStatus,
   CommentKind,
   CommentNote,
   FinalSummary,
   FlowStep,
+  FlowStepKind,
   Importance,
+  ProblemFactor,
+  ProblemStructure,
 } from './types'
 import { NOTE_SCHEMA, FINAL_SCHEMA, FINAL_SCHEMA_WITH_FLOW } from './schema'
 import {
@@ -46,6 +50,24 @@ function coerceImportance(v: unknown): Importance {
     : 'medium'
 }
 
+const VALID_STATUS: ClusterStatus[] = ['resolved', 'open']
+
+/** 不正値・欠落は undefined（従来表示）にフォールバックする。 */
+function coerceStatus(v: unknown): ClusterStatus | undefined {
+  return VALID_STATUS.includes(v as ClusterStatus)
+    ? (v as ClusterStatus)
+    : undefined
+}
+
+const VALID_FLOW_KINDS: FlowStepKind[] = ['action', 'decision', 'outcome']
+
+/** 不正値・欠落は undefined（action と同じ描画）にフォールバックする。 */
+function coerceFlowKind(v: unknown): FlowStepKind | undefined {
+  return VALID_FLOW_KINDS.includes(v as FlowStepKind)
+    ? (v as FlowStepKind)
+    : undefined
+}
+
 export interface ProgressCallback {
   (done: number, total: number, phase: 'map' | 'reduce'): void
 }
@@ -61,8 +83,11 @@ export interface SummarizeOptions {
   signal?: AbortSignal
   /** map 結果の再利用キャッシュ（任意）。 */
   noteCache?: NoteCache
-  /** flowSteps を生成させるか（summarizeSingleShot のみで有効。CLI バックエンド限定）。 */
-  includeFlowSteps?: boolean
+  /**
+   * CLI バックエンド限定の拡張フィールド一式（flowSteps / cluster.status /
+   * flowStep.kind）を生成させるか。summarizeSingleShot のみで有効。
+   */
+  includeExtendedFields?: boolean
 }
 
 /** コメント 1 件を圧縮メモ化する。 */
@@ -152,12 +177,16 @@ function parseClusters(
   byOrdinal: Map<number, ClusterComment>,
 ): Cluster[] {
   const raw = Array.isArray(obj.clusters) ? obj.clusters : []
-  const clusters: Cluster[] = raw.map((c: Record<string, unknown>) => ({
-    title: String(c.title ?? ''),
-    summary: String(c.summary ?? ''),
-    importance: coerceImportance(c.importance),
-    comments: refsToComments(c.commentRefs, byOrdinal),
-  }))
+  const clusters: Cluster[] = raw.map((c: Record<string, unknown>) => {
+    const status = coerceStatus(c.status)
+    return {
+      title: String(c.title ?? ''),
+      summary: String(c.summary ?? ''),
+      importance: coerceImportance(c.importance),
+      ...(status ? { status } : {}),
+      comments: refsToComments(c.commentRefs, byOrdinal),
+    }
+  })
   // 議論のかたまりを時系列に並べる（各クラスタの最早コメント序数の昇順）。
   // 部分要約を任意の順で実行しても、表示は常に時系列になる。
   // 該当コメントが無いクラスタは末尾へ。元の順序を保つ安定ソート。
@@ -184,15 +213,70 @@ function parseFlowSteps(
   if (!Array.isArray(raw)) return undefined
   const steps = raw
     .slice(0, MAX_FLOW_STEPS)
-    .map((s: Record<string, unknown>) => ({
-      label:
-        typeof s?.label === 'string'
-          ? s.label.trim().slice(0, FLOW_STEP_LABEL_MAX)
-          : '',
-      comments: refsToComments(s?.commentRefs, byOrdinal),
-    }))
+    .map((s: Record<string, unknown>) => {
+      const kind = coerceFlowKind(s?.kind)
+      return {
+        label:
+          typeof s?.label === 'string'
+            ? s.label.trim().slice(0, FLOW_STEP_LABEL_MAX)
+            : '',
+        ...(kind ? { kind } : {}),
+        comments: refsToComments(s?.commentRefs, byOrdinal),
+      }
+    })
     .filter((s) => s.label.length > 0)
   return steps.length > 0 ? steps : undefined
+}
+
+const MAX_PROBLEM_FACTORS = 4
+const PROBLEM_LABEL_MAX = 60
+
+/** causes / impacts の 1 配列を防御的に解析する。 */
+function parseProblemFactors(
+  raw: unknown,
+  byOrdinal: Map<number, ClusterComment>,
+): ProblemFactor[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((f: Record<string, unknown>) => ({
+      label:
+        typeof f?.label === 'string'
+          ? f.label.trim().slice(0, PROBLEM_LABEL_MAX)
+          : '',
+      comments: refsToComments(f?.commentRefs, byOrdinal),
+    }))
+    .filter((f) => f.label.length > 0)
+    .slice(0, MAX_PROBLEM_FACTORS)
+}
+
+/**
+ * problemStructure（CLI バックエンド限定・任意項目）を防御的に解析する。
+ * 中心課題が空、または原因・影響・あるべき姿がすべて空なら図にならないため
+ * undefined を返す。Nano の出力にはキー自体が無いため常に通しても影響しない。
+ */
+function parseProblemStructure(
+  raw: unknown,
+  byOrdinal: Map<number, ClusterComment>,
+): ProblemStructure | undefined {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return undefined
+  }
+  const obj = raw as Record<string, unknown>
+  const problem =
+    typeof obj.problem === 'string'
+      ? obj.problem.trim().slice(0, PROBLEM_LABEL_MAX)
+      : ''
+  if (problem.length === 0) return undefined
+  const causes = parseProblemFactors(obj.causes, byOrdinal)
+  const impacts = parseProblemFactors(obj.impacts, byOrdinal)
+  const goal =
+    typeof obj.goal === 'string'
+      ? obj.goal.trim().slice(0, PROBLEM_LABEL_MAX)
+      : ''
+  if (causes.length === 0 && impacts.length === 0 && goal.length === 0) {
+    return undefined
+  }
+  return { problem, causes, impacts, ...(goal ? { goal } : {}) }
 }
 
 async function reduceOnce(
@@ -246,6 +330,7 @@ export function assembleFinalSummary(
   byOrdinal: Map<number, ClusterComment>,
 ): FinalSummary {
   const flowSteps = parseFlowSteps(obj.flowSteps, byOrdinal)
+  const problemStructure = parseProblemStructure(obj.problemStructure, byOrdinal)
   return {
     overview: String(obj.overview ?? ''),
     parentAndLinks: buildParentAndLinks(page, lang),
@@ -253,6 +338,7 @@ export function assembleFinalSummary(
     currentProgress: String(obj.currentProgress ?? ''),
     clusters: parseClusters(obj, byOrdinal),
     ...(flowSteps ? { flowSteps } : {}),
+    ...(problemStructure ? { problemStructure } : {}),
   }
 }
 
@@ -377,10 +463,10 @@ export async function summarizeSingleShot(
     opts.onProgress?.(0, 1, 'reduce')
     const raw = await session.prompt(
       singleShotPrompt(page, comments, opts.lang, {
-        includeFlowSteps: opts.includeFlowSteps,
+        includeExtendedFields: opts.includeExtendedFields,
       }),
       {
-        responseConstraint: opts.includeFlowSteps
+        responseConstraint: opts.includeExtendedFields
           ? FINAL_SCHEMA_WITH_FLOW
           : FINAL_SCHEMA,
         signal: opts.signal,

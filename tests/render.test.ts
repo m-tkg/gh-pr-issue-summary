@@ -301,4 +301,61 @@ describe('renderSummary の図解セクション (diagram オプション)', () 
     const details = [...node.querySelectorAll('.diagram-section details')]
     expect(details).toHaveLength(2)
   })
+
+  it('status や kind があれば図解セクションに凡例が出る', () => {
+    const withMarks = {
+      ...twoClusters,
+      clusters: [
+        { ...twoClusters.clusters[0], status: 'resolved' as const },
+        twoClusters.clusters[1],
+      ],
+    }
+    const node = renderSummary(withMarks, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    const legend = node.querySelector('.diagram-section .diagram-legend')
+    expect(legend).not.toBeNull()
+    expect(legend?.textContent).toContain('✓')
+    expect(legend?.textContent).toContain('決着済み')
+  })
+
+  it('status も kind も無ければ凡例は出ない(Nano・旧キャッシュ)', () => {
+    const node = renderSummary(twoClusters, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    expect(node.querySelector('.diagram-legend')).toBeNull()
+  })
+
+  it('problemStructure があれば「課題の構造」details が議論の構造の直後に出る(閉)', () => {
+    const withProblem = {
+      ...twoClusters,
+      problemStructure: {
+        problem: 'ビルドが遅い',
+        causes: [{ label: '依存が多い', comments: [] }],
+        impacts: [],
+        goal: 'CI を 10 分以内に',
+      },
+    }
+    const node = renderSummary(withProblem, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    const details = [...node.querySelectorAll('.diagram-section details')]
+    const titles = details.map((d) => d.querySelector('summary')?.textContent)
+    expect(titles).toEqual(['議論の構造', '課題の構造', '時系列フロー'])
+    expect((details[1] as HTMLDetailsElement).open).toBe(false)
+  })
+
+  it('problemStructure が無ければ「課題の構造」details は出ない(Nano・旧キャッシュ)', () => {
+    const node = renderSummary(twoClusters, () => {}, {
+      theme: THEME,
+      render: async () => {},
+    })
+    const titles = [...node.querySelectorAll('.diagram-section details')].map(
+      (d) => d.querySelector('summary')?.textContent,
+    )
+    expect(titles).not.toContain('課題の構造')
+  })
 })
