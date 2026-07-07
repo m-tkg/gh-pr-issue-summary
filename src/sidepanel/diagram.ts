@@ -51,6 +51,17 @@ function classDefBlock(theme: DiagramTheme): string {
   ].join('\n')
 }
 
+/**
+ * 決着済み(resolved)ノードのラベルに付ける決定的サフィックス。
+ * escapeLabel 済みラベルの後にコード側で付与するため注入経路にならない。
+ */
+function statusSuffix(status: 'resolved' | 'open' | undefined): string {
+  return status === 'resolved' ? ' ✓' : ''
+}
+
+/** 未決(open)ノード用の点線スタイル。重要度の色クラスと直交して共存できる。 */
+const OPEN_CLASS_DEF = 'classDef stOpen stroke-dasharray:4 3'
+
 /** 議論の構造図（概要 → 各クラスタ(重要度付き) → 現状の進捗）を組み立てる。 */
 export function buildStructureDiagram(
   summary: FinalSummary,
@@ -68,7 +79,7 @@ export function buildStructureDiagram(
   } else {
     clusters.forEach((c, i) => {
       const id = `c${i}`
-      lines.push(`${id}["${label(c.title)}"]`)
+      lines.push(`${id}["${label(c.title)}${statusSuffix(c.status)}"]`)
       lines.push(`ov --> ${id}`)
       lines.push(`${id} --> pg`)
     })
@@ -83,6 +94,12 @@ export function buildStructureDiagram(
   clusters.forEach((c, i) => {
     lines.push(`class c${i} ${c.importance}`)
   })
+  if (clusters.some((c) => c.status === 'open')) {
+    lines.push(OPEN_CLASS_DEF)
+    clusters.forEach((c, i) => {
+      if (c.status === 'open') lines.push(`class c${i} stOpen`)
+    })
+  }
 
   return lines.join('\n')
 }
