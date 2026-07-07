@@ -529,7 +529,7 @@ describe('summarizeSingleShot (大コンテキスト/CLI 向け 1 回要約)', (
     ])
   })
 
-  it('includeFlowSteps: true のとき FINAL_SCHEMA_WITH_FLOW を使い、プロンプトに flowSteps 指示を含む', async () => {
+  it('includeExtendedFields: true のとき FINAL_SCHEMA_WITH_FLOW を使い、プロンプトに flowSteps 指示を含む', async () => {
     const llm = new MockLlmClient(() =>
       JSON.stringify({
         overview: '概要',
@@ -542,7 +542,7 @@ describe('summarizeSingleShot (大コンテキスト/CLI 向け 1 回要約)', (
     const comments = [comment(11, 'a')]
     const { summary } = await summarizeSingleShot(llm, page, comments, {
       lang: 'ja',
-      includeFlowSteps: true,
+      includeExtendedFields: true,
     })
     expect(llm.prompts[0]).toContain('flowSteps')
     expect(llm.promptOptions[0]?.responseConstraint).toBe(
@@ -551,7 +551,7 @@ describe('summarizeSingleShot (大コンテキスト/CLI 向け 1 回要約)', (
     expect(summary.flowSteps?.[0].label).toBe('調査する')
   })
 
-  it('includeFlowSteps 省略時は FINAL_SCHEMA を使い、プロンプトに flowSteps 指示を含まない', async () => {
+  it('includeExtendedFields 省略時は FINAL_SCHEMA を使い、プロンプトに flowSteps 指示を含まない', async () => {
     const llm = new MockLlmClient(() =>
       JSON.stringify({
         overview: '概要',

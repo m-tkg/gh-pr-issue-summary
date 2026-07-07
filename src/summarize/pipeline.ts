@@ -81,8 +81,11 @@ export interface SummarizeOptions {
   signal?: AbortSignal
   /** map 結果の再利用キャッシュ（任意）。 */
   noteCache?: NoteCache
-  /** flowSteps を生成させるか（summarizeSingleShot のみで有効。CLI バックエンド限定）。 */
-  includeFlowSteps?: boolean
+  /**
+   * CLI バックエンド限定の拡張フィールド一式（flowSteps / cluster.status /
+   * flowStep.kind）を生成させるか。summarizeSingleShot のみで有効。
+   */
+  includeExtendedFields?: boolean
 }
 
 /** コメント 1 件を圧縮メモ化する。 */
@@ -405,10 +408,10 @@ export async function summarizeSingleShot(
     opts.onProgress?.(0, 1, 'reduce')
     const raw = await session.prompt(
       singleShotPrompt(page, comments, opts.lang, {
-        includeFlowSteps: opts.includeFlowSteps,
+        includeExtendedFields: opts.includeExtendedFields,
       }),
       {
-        responseConstraint: opts.includeFlowSteps
+        responseConstraint: opts.includeExtendedFields
           ? FINAL_SCHEMA_WITH_FLOW
           : FINAL_SCHEMA,
         signal: opts.signal,

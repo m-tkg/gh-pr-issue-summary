@@ -70,16 +70,16 @@ describe('singleShotPrompt の flowSteps オプション (CLI 限定)', () => {
     expect(p).not.toContain('flowSteps')
   })
 
-  it('includeFlowSteps: false でも含まない', () => {
+  it('includeExtendedFields: false でも含まない', () => {
     const p = singleShotPrompt(page, [comment('hi')], 'ja', {
-      includeFlowSteps: false,
+      includeExtendedFields: false,
     })
     expect(p).not.toContain('flowSteps')
   })
 
-  it('includeFlowSteps: true で flowSteps の指示を含む', () => {
+  it('includeExtendedFields: true で flowSteps の指示を含む', () => {
     const p = singleShotPrompt(page, [comment('hi')], 'ja', {
-      includeFlowSteps: true,
+      includeExtendedFields: true,
     })
     expect(p).toContain('flowSteps')
     expect(p).toContain('label')
@@ -121,16 +121,16 @@ describe('図解ノードラベルの品質指示', () => {
 
   it('flowSteps の label 指示は具体性の要求と良い例/悪い例を含む', () => {
     const p = singleShotPrompt(page, [comment('hi')], 'ja', {
-      includeFlowSteps: true,
+      includeExtendedFields: true,
     })
     expect(p).toContain('30 字以内')
     expect(p).toMatch(/悪い例[\s\S]*「実装する」/)
     expect(p).toContain('何を')
   })
 
-  it('includeFlowSteps: true のとき kind の指示を含む', () => {
+  it('includeExtendedFields: true のとき kind の指示を含む', () => {
     const p = singleShotPrompt(page, [comment('hi')], 'ja', {
-      includeFlowSteps: true,
+      includeExtendedFields: true,
     })
     expect(p).toContain('kind')
     expect(p).toContain('"action"')
@@ -145,9 +145,9 @@ describe('図解ノードラベルの品質指示', () => {
 })
 
 describe('cluster.status の指示 (CLI 限定)', () => {
-  it('includeFlowSteps: true のとき status の指示を含む', () => {
+  it('includeExtendedFields: true のとき status の指示を含む', () => {
     const p = singleShotPrompt(page, [comment('hi')], 'ja', {
-      includeFlowSteps: true,
+      includeExtendedFields: true,
     })
     expect(p).toContain('status')
     expect(p).toContain('"resolved"')

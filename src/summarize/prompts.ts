@@ -104,8 +104,11 @@ export function reducePrompt(
 export const SINGLESHOT_PER_COMMENT_TOKEN_BUDGET = 1500
 
 export interface SingleShotPromptOptions {
-  /** 作業・提案内容の flowSteps を生成させるか（CLI バックエンド限定）。 */
-  includeFlowSteps?: boolean
+  /**
+   * CLI バックエンド限定の拡張フィールド一式（flowSteps / cluster.status /
+   * flowStep.kind）の生成指示を含めるか。
+   */
+  includeExtendedFields?: boolean
 }
 
 export function singleShotPrompt(
@@ -128,7 +131,7 @@ export function singleShotPrompt(
   // 字数指示の 3 層構造: プロンプト指示（title 25 字 / label 30 字）
   //   < 図の切り詰め 40 字（diagram.ts truncateLabel）
   //   < パーサ上限 60 字（pipeline.ts FLOW_STEP_LABEL_MAX、防御バッファ）。
-  const flowStepsInstruction = opts.includeFlowSteps
+  const flowStepsInstruction = opts.includeExtendedFields
     ? [
         `- flowSteps: この PR/issue で実現しようとしている変更・提案の流れを、`,
         `  読者が図だけで全体像を掴めるように 3〜7 個の手順に分けた配列（任意、無ければ省略可）。`,
@@ -167,14 +170,14 @@ export function singleShotPrompt(
     `- currentProgress: 現状の進捗・結論の状態。これも最初の一文で状態を言い切ること。`,
     `- clusters: 議論のかたまりの配列。各要素は`,
     `    title(string) / summary(string) / importance("high"|"medium"|"low") /`,
-    ...(opts.includeFlowSteps ? [`    status("resolved"|"open") /`] : []),
+    ...(opts.includeExtendedFields ? [`    status("resolved"|"open") /`] : []),
     `    commentRefs(その論点に関係するコメントの [番号] の整数配列)`,
     `  title は図のノードラベルとしてそのまま表示される。25 字以内で、`,
     `  「何が」「どうなったか」が分かる具体的な短文にすること。`,
     `  関数名・API 名・設定名などの固有名詞があれば優先して含める。`,
     `  悪い例:「実装方針について」「エラーハンドリング」`,
     `  良い例:「retry 上限は 3 回に決定」「iframe 案は CSP 違反で却下」`,
-    ...(opts.includeFlowSteps
+    ...(opts.includeExtendedFields
       ? [
           `  status はその論点が決着済みなら "resolved"、未決なら "open"。`,
           `  判断できなければ省略してよい。`,
