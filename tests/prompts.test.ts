@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   systemPrompt,
   mapPrompt,
+  reducePrompt,
   singleShotPrompt,
   UNTRUSTED_BEGIN,
   UNTRUSTED_END,
@@ -83,5 +84,47 @@ describe('singleShotPrompt の flowSteps オプション (CLI 限定)', () => {
     expect(p).toContain('flowSteps')
     expect(p).toContain('label')
     expect(p).toContain('commentRefs')
+  })
+})
+
+describe('図解ノードラベルの品質指示', () => {
+  it('reducePrompt は title が図のノードラベルになる旨と具体性の指示を含む', () => {
+    const notes = [
+      {
+        ordinal: 1,
+        id: 'c1',
+        url: 'u',
+        author: 'a',
+        gist: 'g',
+        kind: 'info' as const,
+        importance: 'low' as const,
+      },
+    ]
+    const p = reducePrompt(notes, page, 'ja')
+    expect(p).toContain('ノードラベル')
+    expect(p).toContain('25 字')
+    expect(p).toContain('実装方針について') // 避けるべき抽象語の例
+  })
+
+  it('singleShotPrompt は title のノードラベル指示と良い例/悪い例を含む（flowSteps 無しでも）', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja')
+    expect(p).toContain('ノードラベル')
+    expect(p).toContain('25 字')
+    expect(p).toContain('悪い例')
+    expect(p).toContain('良い例')
+  })
+
+  it('singleShotPrompt は overview / currentProgress に結論先出しの指示を含む', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja')
+    expect(p).toContain('最初の一文')
+  })
+
+  it('flowSteps の label 指示は具体性の要求と良い例/悪い例を含む', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja', {
+      includeFlowSteps: true,
+    })
+    expect(p).toContain('30 字以内')
+    expect(p).toMatch(/悪い例[\s\S]*「実装する」/)
+    expect(p).toContain('何を')
   })
 })
