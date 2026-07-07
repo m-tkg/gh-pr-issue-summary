@@ -1,4 +1,8 @@
-import type { FinalSummary, FlowStep } from '../summarize/types'
+import type {
+  FinalSummary,
+  FlowStep,
+  ProblemStructure,
+} from '../summarize/types'
 
 // FinalSummary から mermaid ソースを決定的に組み立てる純粋関数群。
 // LLM には mermaid コードを直接書かせない（構文エラーを原理的に排除するため）。
@@ -169,6 +173,49 @@ export function buildContentFlowDiagram(
   }
   lines.push(`classDef step stroke:${theme.medium}`)
   steps.forEach((_s, i) => lines.push(`class s${i} step`))
+
+  return lines.join('\n')
+}
+
+/**
+ * 解決したい課題の因果構造（CLI バックエンド限定・任意）を
+ * 原因群 → 中心課題 → 影響群 ＋ あるべき姿(点線・角丸) として組み立てる。
+ * 中心課題しか無い場合は図にならないため null を返す。
+ */
+export function buildProblemDiagram(
+  ps: ProblemStructure,
+  theme: DiagramTheme,
+): string | null {
+  const hasGoal = Boolean(ps.goal)
+  if (
+    ps.problem.length === 0 ||
+    (ps.causes.length === 0 && ps.impacts.length === 0 && !hasGoal)
+  ) {
+    return null
+  }
+
+  const lines = ['flowchart LR']
+  lines.push(`pb["${label(ps.problem)}"]`)
+  ps.causes.forEach((c, i) => {
+    lines.push(`ca${i}["${label(c.label)}"]`)
+    lines.push(`ca${i} --> pb`)
+  })
+  ps.impacts.forEach((im, i) => {
+    lines.push(`im${i}["${label(im.label)}"]`)
+    lines.push(`pb --> im${i}`)
+  })
+  if (hasGoal) {
+    lines.push(`gl(["${label(ps.goal ?? '')}"])`)
+    lines.push('pb -.-> gl')
+  }
+
+  lines.push(`classDef problem stroke:${theme.high},stroke-width:3px`)
+  lines.push(`classDef factor stroke:${theme.medium}`)
+  lines.push(`classDef goal stroke:${theme.low}`)
+  lines.push('class pb problem')
+  ps.causes.forEach((_c, i) => lines.push(`class ca${i} factor`))
+  ps.impacts.forEach((_im, i) => lines.push(`class im${i} factor`))
+  if (hasGoal) lines.push('class gl goal')
 
   return lines.join('\n')
 }
