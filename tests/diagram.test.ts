@@ -5,6 +5,7 @@ import {
   buildStructureDiagram,
   buildTimelineDiagram,
   buildContentFlowDiagram,
+  buildProblemDiagram,
   type DiagramTheme,
 } from '../src/sidepanel/diagram'
 import type {
@@ -12,6 +13,7 @@ import type {
   ClusterComment,
   FinalSummary,
   FlowStep,
+  ProblemStructure,
 } from '../src/summarize/types'
 
 const THEME: DiagramTheme = {
@@ -426,5 +428,91 @@ describe('buildContentFlowDiagram', () => {
     )
     expect(out).not.toContain('"} click')
     expect(out).not.toContain('alert(1)"')
+  })
+})
+
+describe('buildProblemDiagram', () => {
+  function problem(overrides: Partial<ProblemStructure> = {}): ProblemStructure {
+    return {
+      problem: '中心課題',
+      causes: [],
+      impacts: [],
+      ...overrides,
+    }
+  }
+
+  it('原因・影響・あるべき姿がすべて無ければ null を返す', () => {
+    expect(buildProblemDiagram(problem(), THEME)).toBeNull()
+  })
+
+  it('flowchart LR で、原因 → 課題 → 影響 とあるべき姿(点線・角丸)を組み立てる', () => {
+    const out = buildProblemDiagram(
+      problem({
+        causes: [
+          { label: '依存が多い', comments: [] },
+          { label: 'キャッシュ無効', comments: [] },
+        ],
+        impacts: [{ label: 'CI が 30 分かかる', comments: [] }],
+        goal: 'CI を 10 分以内に',
+      }),
+      THEME,
+    )
+    expect(out).not.toBeNull()
+    expect((out as string).startsWith('flowchart LR')).toBe(true)
+    expect(out).toContain('pb["中心課題"]')
+    expect(out).toContain('ca0["依存が多い"]')
+    expect(out).toContain('ca1["キャッシュ無効"]')
+    expect(out).toContain('ca0 --> pb')
+    expect(out).toContain('ca1 --> pb')
+    expect(out).toContain('im0["CI が 30 分かかる"]')
+    expect(out).toContain('pb --> im0')
+    expect(out).toContain('gl(["CI を 10 分以内に"])')
+    expect(out).toContain('pb -.-> gl')
+  })
+
+  it('goal が無ければ gl ノードが出ない', () => {
+    const out = buildProblemDiagram(
+      problem({ causes: [{ label: 'X', comments: [] }] }),
+      THEME,
+    )
+    expect(out).not.toContain('gl')
+  })
+
+  it('課題ノードは強調クラス、原因・影響・goal にもクラスが付く', () => {
+    const out = buildProblemDiagram(
+      problem({
+        causes: [{ label: 'X', comments: [] }],
+        impacts: [{ label: 'Y', comments: [] }],
+        goal: 'Z',
+      }),
+      THEME,
+    )
+    expect(out).toContain('class pb problem')
+    expect(out).toContain('class ca0 factor')
+    expect(out).toContain('class im0 factor')
+    expect(out).toContain('class gl goal')
+    expect(out).toContain(THEME.high)
+  })
+
+  it('悪意あるラベルはエスケープされ、生の " が残らない', () => {
+    const malicious = '"] click pb "javascript:alert(1)"'
+    const out = buildProblemDiagram(
+      problem({
+        problem: malicious,
+        causes: [{ label: malicious, comments: [] }],
+        goal: malicious,
+      }),
+      THEME,
+    )
+    expect(out).not.toContain('"] click')
+  })
+
+  it('長いラベルは 40 字に省略される', () => {
+    const long = 'あ'.repeat(50)
+    const out = buildProblemDiagram(
+      problem({ problem: long, causes: [{ label: 'X', comments: [] }] }),
+      THEME,
+    )
+    expect(out).toContain('あ'.repeat(40) + '…')
   })
 })
