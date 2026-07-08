@@ -99,6 +99,15 @@ export const FINAL_SCHEMA_WITH_FLOW: Record<string, unknown> = {
         goal: { type: 'string' },
       },
     },
+    prSummary: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['problem', 'solution'],
+      properties: {
+        problem: { type: 'string' },
+        solution: { type: 'string' },
+      },
+    },
     flowSteps: {
       type: 'array',
       items: {

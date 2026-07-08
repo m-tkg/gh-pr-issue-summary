@@ -248,6 +248,15 @@ h2 {
   white-space: pre-wrap;
 }
 
+/* PR の要点（解決したい問題 / 解決方法） */
+.pr-tldr {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--bg-muted);
+}
+
 /* 図解 */
 .diagram-section details {
   margin-bottom: 8px;

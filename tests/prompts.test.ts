@@ -144,6 +144,32 @@ describe('図解ノードラベルの品質指示', () => {
   })
 })
 
+describe('prSummary の指示 (CLI 限定・PR のみ)', () => {
+  const pullPage: PageData = { ...page, type: 'pull' }
+
+  it('PR かつ includeExtendedFields: true のとき prSummary の指示を含む', () => {
+    const p = singleShotPrompt(pullPage, [comment('hi')], 'ja', {
+      includeExtendedFields: true,
+    })
+    expect(p).toContain('prSummary')
+    expect(p).toContain('problem')
+    expect(p).toContain('solution')
+    expect(p).toMatch(/prSummary[\s\S]*1〜3 行/)
+  })
+
+  it('issue では includeExtendedFields: true でも prSummary の指示を含まない', () => {
+    const p = singleShotPrompt(page, [comment('hi')], 'ja', {
+      includeExtendedFields: true,
+    })
+    expect(p).not.toContain('prSummary')
+  })
+
+  it('PR でも includeExtendedFields 省略時は含まない', () => {
+    const p = singleShotPrompt(pullPage, [comment('hi')], 'ja')
+    expect(p).not.toContain('prSummary')
+  })
+})
+
 describe('problemStructure の指示 (CLI 限定)', () => {
   it('includeExtendedFields: true のとき problemStructure の指示を含む', () => {
     const p = singleShotPrompt(page, [comment('hi')], 'ja', {

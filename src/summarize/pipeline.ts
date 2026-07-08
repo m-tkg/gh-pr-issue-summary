@@ -14,6 +14,7 @@ import type {
   Importance,
   ProblemFactor,
   ProblemStructure,
+  PrSummary,
 } from './types'
 import { NOTE_SCHEMA, FINAL_SCHEMA, FINAL_SCHEMA_WITH_FLOW } from './schema'
 import {
@@ -279,6 +280,25 @@ function parseProblemStructure(
   return { problem, causes, impacts, ...(goal ? { goal } : {}) }
 }
 
+const PR_SUMMARY_TEXT_MAX = 300
+
+/**
+ * prSummary（CLI バックエンド限定・PR のみの任意項目）を防御的に解析する。
+ * 問題と解決方法は対で意味を成すため、どちらかが空なら undefined を返す。
+ */
+function parsePrSummary(raw: unknown): PrSummary | undefined {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return undefined
+  }
+  const obj = raw as Record<string, unknown>
+  const text = (v: unknown) =>
+    typeof v === 'string' ? v.trim().slice(0, PR_SUMMARY_TEXT_MAX) : ''
+  const problem = text(obj.problem)
+  const solution = text(obj.solution)
+  if (problem.length === 0 || solution.length === 0) return undefined
+  return { problem, solution }
+}
+
 async function reduceOnce(
   llm: LlmClient,
   prompt: string,
@@ -331,6 +351,7 @@ export function assembleFinalSummary(
 ): FinalSummary {
   const flowSteps = parseFlowSteps(obj.flowSteps, byOrdinal)
   const problemStructure = parseProblemStructure(obj.problemStructure, byOrdinal)
+  const prSummary = parsePrSummary(obj.prSummary)
   return {
     overview: String(obj.overview ?? ''),
     parentAndLinks: buildParentAndLinks(page, lang),
@@ -339,6 +360,7 @@ export function assembleFinalSummary(
     clusters: parseClusters(obj, byOrdinal),
     ...(flowSteps ? { flowSteps } : {}),
     ...(problemStructure ? { problemStructure } : {}),
+    ...(prSummary ? { prSummary } : {}),
   }
 }
 
