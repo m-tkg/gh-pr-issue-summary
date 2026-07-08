@@ -248,8 +248,8 @@ h2 {
   white-space: pre-wrap;
 }
 
-/* PR の要点（解決したい問題 / 解決方法） */
-.pr-tldr {
+/* issue/PR の要点（解決したい問題 / 解決方法） */
+.tldr {
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   border-radius: 6px;

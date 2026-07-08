@@ -128,6 +128,8 @@ export function singleShotPrompt(
     })
     .join('\n\n')
 
+  const docLabel = page.type === 'pull' ? 'PR' : 'issue'
+
   // 字数指示の 3 層構造: プロンプト指示（title 25 字 / label 30 字）
   //   < 図の切り詰め 40 字（diagram.ts truncateLabel）
   //   < パーサ上限 60 字（pipeline.ts FLOW_STEP_LABEL_MAX、防御バッファ）。
@@ -152,13 +154,9 @@ export function singleShotPrompt(
         `    impacts: 課題が引き起こす影響・困りごとの配列（0〜4 個）。`,
         `      各要素は label(25 字以内) / commentRefs。`,
         `    goal(string, 25 字以内): 解決後のあるべき姿（任意）。`,
-        ...(page.type === 'pull'
-          ? [
-              `- prSummary: この PR の要点。要約の最上部に表示される。次のキーを持つ。`,
-              `    problem(string): この PR が解決したい問題を 1〜3 行で簡潔に。`,
-              `    solution(string): この PR での解決方法を 1〜3 行で簡潔に。`,
-            ]
-          : []),
+        `- tldr: この ${docLabel} の要点。要約の最上部に表示される。次のキーを持つ。`,
+        `    problem(string): この ${docLabel} が解決したい問題を 1〜3 行で簡潔に。`,
+        `    solution(string): その解決方法・対応方針を 1〜3 行で簡潔に。`,
       ]
     : []
 
