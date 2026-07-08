@@ -545,6 +545,76 @@ describe('assembleFinalSummary の problemStructure 解析 (optional, CLI 限定
   })
 })
 
+describe('assembleFinalSummary の prSummary 解析 (optional, CLI 限定・PR のみ)', () => {
+  function byOrdinal(...ordinals: number[]): Map<number, ClusterComment> {
+    return new Map(
+      ordinals.map((o) => [
+        o,
+        { url: `/r/r/issues/1#issuecomment-${o}`, ordinal: o, author: 'a' },
+      ]),
+    )
+  }
+  const base = {
+    overview: 'ov',
+    overallDiscussion: 'od',
+    currentProgress: 'cp',
+    clusters: [],
+  }
+
+  it('無ければ undefined', () => {
+    const summary = assembleFinalSummary(base, page, 'ja', byOrdinal(1))
+    expect(summary.prSummary).toBeUndefined()
+  })
+
+  it('正常系: problem / solution を採用する', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        prSummary: {
+          problem: 'ビルドが遅く CI が 30 分かかる',
+          solution: '依存を整理しキャッシュを有効化する',
+        },
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.prSummary?.problem).toBe('ビルドが遅く CI が 30 分かかる')
+    expect(summary.prSummary?.solution).toBe('依存を整理しキャッシュを有効化する')
+  })
+
+  it('オブジェクトでない・どちらかが空なら undefined（片方だけの表示はしない）', () => {
+    const cases = [
+      '不正',
+      { problem: 'P', solution: ' ' },
+      { problem: '', solution: 'S' },
+      { problem: 'P' },
+    ]
+    for (const prSummary of cases) {
+      const summary = assembleFinalSummary(
+        { ...base, prSummary },
+        page,
+        'ja',
+        byOrdinal(1),
+      )
+      expect(summary.prSummary).toBeUndefined()
+    }
+  })
+
+  it('長すぎる文は 300 字に切り詰める', () => {
+    const summary = assembleFinalSummary(
+      {
+        ...base,
+        prSummary: { problem: 'あ'.repeat(400), solution: 'S' },
+      },
+      page,
+      'ja',
+      byOrdinal(1),
+    )
+    expect(summary.prSummary?.problem).toBe('あ'.repeat(300))
+  })
+})
+
 describe('スキーマの status フィールド (Nano 安定性の保護)', () => {
   function clusterItems(schema: Record<string, unknown>): {
     required: string[]
@@ -579,6 +649,17 @@ describe('スキーマの status フィールド (Nano 安定性の保護)', () 
     >
     expect(flowProps).toHaveProperty('problemStructure')
     expect(FINAL_SCHEMA_WITH_FLOW.required).not.toContain('problemStructure')
+  })
+
+  it('FINAL_SCHEMA に prSummary は無く、WITH_FLOW にはあり required ではない', () => {
+    const props = FINAL_SCHEMA.properties as Record<string, unknown>
+    expect(props).not.toHaveProperty('prSummary')
+    const flowProps = FINAL_SCHEMA_WITH_FLOW.properties as Record<
+      string,
+      unknown
+    >
+    expect(flowProps).toHaveProperty('prSummary')
+    expect(FINAL_SCHEMA_WITH_FLOW.required).not.toContain('prSummary')
   })
 
   it('FINAL_SCHEMA_WITH_FLOW の flowSteps に kind enum があり required ではない', () => {
