@@ -152,6 +152,13 @@ export function singleShotPrompt(
         `    impacts: 課題が引き起こす影響・困りごとの配列（0〜4 個）。`,
         `      各要素は label(25 字以内) / commentRefs。`,
         `    goal(string, 25 字以内): 解決後のあるべき姿（任意）。`,
+        ...(page.type === 'pull'
+          ? [
+              `- prSummary: この PR の要点。要約の最上部に表示される。次のキーを持つ。`,
+              `    problem(string): この PR が解決したい問題を 1〜3 行で簡潔に。`,
+              `    solution(string): この PR での解決方法を 1〜3 行で簡潔に。`,
+            ]
+          : []),
       ]
     : []
 
