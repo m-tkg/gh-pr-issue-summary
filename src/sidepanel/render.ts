@@ -253,17 +253,17 @@ export function renderSummary(
   diagram?: DiagramOptions,
 ): HTMLElement {
   const wrap = el('div', { class: 'summary' })
-  // PR の要点（CLI バックエンドかつ PR のときのみ存在）。最上部に表示する。
-  if (summary.prSummary) {
+  // issue/PR の要点（CLI バックエンドのみ存在）。最上部に表示する。
+  if (summary.tldr) {
     wrap.append(
-      el('section', { class: 'summary-section pr-tldr' }, [
+      el('section', { class: 'summary-section tldr' }, [
         el('p', {}, [
           el('strong', {}, ['解決したい問題: ']),
-          summary.prSummary.problem,
+          summary.tldr.problem,
         ]),
         el('p', {}, [
           el('strong', {}, ['解決方法: ']),
-          summary.prSummary.solution,
+          summary.tldr.solution,
         ]),
       ]),
     )

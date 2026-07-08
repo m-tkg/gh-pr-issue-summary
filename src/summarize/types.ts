@@ -83,10 +83,10 @@ export interface ProblemStructure {
 }
 
 /**
- * PR の要点（解決したい問題と解決方法、各 1〜3 行）。
- * CLI バックエンド限定・PR のときのみ生成される任意項目。
+ * issue/PR の要点（解決したい問題と解決方法、各 1〜3 行）。
+ * CLI バックエンド限定の任意項目。
  */
-export interface PrSummary {
+export interface Tldr {
   problem: string
   solution: string
 }
@@ -107,6 +107,6 @@ export interface FinalSummary {
   flowSteps?: FlowStep[]
   /** 解決したい課題の構造（CLI バックエンドのみ生成、Nano では常に undefined）。 */
   problemStructure?: ProblemStructure
-  /** PR の要点（CLI バックエンドかつ PR のときのみ生成、それ以外は undefined）。 */
-  prSummary?: PrSummary
+  /** issue/PR の要点（CLI バックエンドのみ生成、Nano では常に undefined）。 */
+  tldr?: Tldr
 }

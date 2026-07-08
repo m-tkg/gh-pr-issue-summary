@@ -348,34 +348,34 @@ describe('renderSummary の図解セクション (diagram オプション)', () 
     expect((details[1] as HTMLDetailsElement).open).toBe(false)
   })
 
-  it('prSummary があれば要約の最上部に問題と解決方法が出る', () => {
-    const withPr = {
+  it('tldr があれば要約の最上部に問題と解決方法が出る', () => {
+    const withTldr = {
       ...twoClusters,
-      prSummary: {
+      tldr: {
         problem: 'ビルドが遅く CI が 30 分かかる',
         solution: '依存を整理しキャッシュを有効化する',
       },
     }
-    const node = renderSummary(withPr, () => {}, {
+    const node = renderSummary(withTldr, () => {}, {
       theme: THEME,
       render: async () => {},
     })
-    const tldr = node.querySelector('.pr-tldr')
+    const tldr = node.querySelector('.tldr')
     expect(tldr).not.toBeNull()
     expect(tldr?.textContent).toContain('解決したい問題')
     expect(tldr?.textContent).toContain('ビルドが遅く CI が 30 分かかる')
     expect(tldr?.textContent).toContain('解決方法')
     expect(tldr?.textContent).toContain('依存を整理しキャッシュを有効化する')
     // 最上部（先頭の子要素）に出る
-    expect(node.firstElementChild?.classList.contains('pr-tldr')).toBe(true)
+    expect(node.firstElementChild?.classList.contains('tldr')).toBe(true)
   })
 
-  it('prSummary が無ければ TL;DR ブロックは出ない(issue・Nano・旧キャッシュ)', () => {
+  it('tldr が無ければ TL;DR ブロックは出ない(Nano・旧キャッシュ)', () => {
     const node = renderSummary(twoClusters, () => {}, {
       theme: THEME,
       render: async () => {},
     })
-    expect(node.querySelector('.pr-tldr')).toBeNull()
+    expect(node.querySelector('.tldr')).toBeNull()
   })
 
   it('problemStructure が無ければ「課題の構造」details は出ない(Nano・旧キャッシュ)', () => {
