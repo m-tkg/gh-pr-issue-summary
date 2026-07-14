@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { NativeCliLlmClient } from '../src/summarize/nativeCliClient'
-import { parseCodexOutput } from '../native-host/gh_summary_host.mjs'
+import { cliSpec, parseCodexOutput } from '../native-host/gh_summary_host.mjs'
 
 // chrome.runtime.sendNativeMessage をモック
 function mockChrome(responder: (msg: unknown) => unknown) {
@@ -31,6 +31,36 @@ describe('parseCodexOutput', () => {
     const raw =
       'not json\n{"type":"item.completed","item":{"type":"agent_message","text":"OK"}}\ngarbage'
     expect(parseCodexOutput(raw)).toBe('OK')
+  })
+})
+
+describe('cliSpec', () => {
+  it('Cursor Agent を ask/read-only 相当で非対話実行する', () => {
+    const spec = cliSpec(
+      'cursor',
+      { cursor: '/usr/local/bin/cursor-agent' },
+      'gpt-5',
+    )
+    expect(spec).not.toBeNull()
+    expect(spec?.bin).toBe('/usr/local/bin/cursor-agent')
+    expect(spec?.args('これを要約')).toEqual([
+      '--print',
+      '--output-format',
+      'text',
+      '--mode',
+      'ask',
+      '--sandbox',
+      'enabled',
+      '--model',
+      'gpt-5',
+      'これを要約',
+    ])
+    expect(spec?.useStdin).toBe(false)
+  })
+
+  it('cursor のパス未指定時は agent コマンドを使う', () => {
+    const spec = cliSpec('cursor')
+    expect(spec?.bin).toBe('agent')
   })
 })
 
@@ -80,6 +110,18 @@ describe('NativeCliLlmClient', () => {
     const session = await c.createSession({})
     await session.prompt('p')
     expect(seen[0]).toEqual({ cli: 'claude-code', prompt: 'p', model: 'haiku' })
+  })
+
+  it('prompt: cursor をホストへ送れる', async () => {
+    const seen: unknown[] = []
+    mockChrome((msg) => {
+      seen.push(msg)
+      return { ok: true, text: 'x' }
+    })
+    const c = new NativeCliLlmClient('cursor')
+    const session = await c.createSession({})
+    await session.prompt('p')
+    expect(seen[0]).toEqual({ cli: 'cursor', prompt: 'p', model: '' })
   })
 
   it('prompt: ホストが ok:false ならエラー', async () => {

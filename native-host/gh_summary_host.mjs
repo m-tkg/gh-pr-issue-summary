@@ -92,6 +92,25 @@ export function cliSpec(cliKey, paths = {}, model = '') {
         useStdin: true,
         parse: (raw) => raw.trim(),
       }
+    case 'cursor':
+      // Cursor Agent: ask モード + sandbox enabled で読み取り専用の応答用途に寄せる。
+      // --print はツールアクセスを持つため、--force/--yolo は付けない。
+      return {
+        bin: paths.cursor || 'agent',
+        args: (prompt) => [
+          '--print',
+          '--output-format',
+          'text',
+          '--mode',
+          'ask',
+          '--sandbox',
+          'enabled',
+          ...(m ? ['--model', m] : []),
+          prompt,
+        ],
+        useStdin: false,
+        parse: (raw) => raw.trim(),
+      }
     default:
       return null
   }

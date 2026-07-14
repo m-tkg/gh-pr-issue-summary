@@ -28,18 +28,23 @@ if [ -x "$HOME/.local/bin/claude" ]; then CLAUDE="$HOME/.local/bin/claude"; fi
 CODEX="$(resolve codex)"
 ANTIGRAVITY="$(resolve agy)"
 if [ -x "$HOME/.local/bin/agy" ]; then ANTIGRAVITY="$HOME/.local/bin/agy"; fi
+CURSOR="$(resolve agent)"
+if [ -x "$HOME/.local/bin/agent" ]; then CURSOR="$HOME/.local/bin/agent"; fi
+if [ -z "$CURSOR" ] && [ -x "$HOME/.local/bin/cursor-agent" ]; then CURSOR="$HOME/.local/bin/cursor-agent"; fi
 
 cat > "$DIR/cli-paths.json" <<EOF
 {
   "claude": "${CLAUDE}",
   "codex": "${CODEX}",
-  "antigravity": "${ANTIGRAVITY}"
+  "antigravity": "${ANTIGRAVITY}",
+  "cursor": "${CURSOR}"
 }
 EOF
 echo "解決した CLI パス:"
 echo "  claude     : ${CLAUDE:-(未検出)}"
 echo "  codex      : ${CODEX:-(未検出)}"
 echo "  antigravity: ${ANTIGRAVITY:-(未検出)}"
+echo "  cursor     : ${CURSOR:-(未検出)}"
 
 # --- node ラッパ（Chrome の最小 PATH でも動くよう絶対パスで node を呼ぶ） ---
 cat > "$WRAPPER" <<EOF

@@ -1,4 +1,4 @@
-// ローカル CLI(claude-code / codex / antigravity)を Native Messaging 経由で使う
+// ローカル CLI(claude-code / codex / antigravity / cursor)を Native Messaging 経由で使う
 // LlmClient 実装。拡張 → ネイティブホスト → CLI と中継する。
 
 import type {
@@ -11,12 +11,13 @@ import type {
 
 export const NATIVE_HOST_NAME = 'com.m_tkg.gh_summary_host'
 
-export type CliKind = 'claude-code' | 'codex' | 'antigravity'
+export type CliKind = 'claude-code' | 'codex' | 'antigravity' | 'cursor'
 
 export const CLI_LABELS: { value: CliKind; label: string }[] = [
   { value: 'claude-code', label: 'Claude Code' },
   { value: 'codex', label: 'Codex' },
   { value: 'antigravity', label: 'Antigravity' },
+  { value: 'cursor', label: 'Cursor Agent' },
 ]
 
 /**
@@ -49,6 +50,11 @@ export const MODEL_PRESETS: Record<
     { value: 'Claude Opus 4.6 (Thinking)', label: 'Claude Opus 4.6 (Thinking)' },
     { value: 'Claude Sonnet 4.6 (Thinking)', label: 'Claude Sonnet 4.6 (Thinking)' },
     { value: 'GPT-OSS 120B (Medium)', label: 'GPT-OSS 120B (Medium)' },
+  ],
+  cursor: [
+    { value: '', label: 'デフォルト' },
+    { value: 'gpt-5', label: 'gpt-5' },
+    { value: 'sonnet-4-thinking', label: 'sonnet-4-thinking' },
   ],
 }
 
