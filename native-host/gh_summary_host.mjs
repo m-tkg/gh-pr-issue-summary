@@ -94,6 +94,7 @@ export function cliSpec(cliKey, paths = {}, model = '') {
       }
     case 'cursor':
       // Cursor Agent: ask モード + sandbox enabled で読み取り専用の応答用途に寄せる。
+      // headless 実行では workspace trust の対話確認を出せないため --trust を付ける。
       // --print はツールアクセスを持つため、--force/--yolo は付けない。
       return {
         bin: paths.cursor || 'agent',
@@ -101,6 +102,7 @@ export function cliSpec(cliKey, paths = {}, model = '') {
           '--print',
           '--output-format',
           'text',
+          '--trust',
           '--mode',
           'ask',
           '--sandbox',

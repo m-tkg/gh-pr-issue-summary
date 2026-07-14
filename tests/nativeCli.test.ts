@@ -47,6 +47,7 @@ describe('cliSpec', () => {
       '--print',
       '--output-format',
       'text',
+      '--trust',
       '--mode',
       'ask',
       '--sandbox',
